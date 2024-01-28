@@ -15,9 +15,13 @@
 				</h1>
 				<div class="ml-auto">
 					<p class="text-black/80">
-						{$paciStore.connectionState === 'connected'
-							? `Connected: ${$paciStore.deviceInfo?.name}`
-							: 'Not Connected'}
+						{#if $paciStore.connectionState === 'connected'}
+							Connected: {$paciStore.deviceInfo?.name}
+						{:else if $paciStore.connectionState === 'reconnecting'}
+							Reconnecting: {$paciStore.deviceInfo?.name}
+						{:else}
+							Disconnected
+						{/if}
 					</p>
 				</div>
 			</div>
