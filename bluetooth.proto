@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package bluetooth;
+
+message Version {
+    uint32 major = 1;
+    uint32 minor = 2;
+    uint32 revision = 3;
+    uint32 build = 4;
+    bytes commit = 5;
+    int64 timestamp = 6;
+}
+
+message CalibrateSensor {
+    enum Sensor {
+        INVALID = 0;
+        BITE_MIN = 1;
+        BITE_MAX = 2;
+        SUCK_MIN = 3;
+        SUCK_MAX = 4;
+    }
+    Sensor sensor = 1;
+}
+
+message VersionRequest {
+
+}
+
+// Requests sent to the control enpoint.
+message ControlRequest {
+    oneof request {
+        CalibrateSensor calibrate_sensor = 1;
+        VersionRequest firmware_version = 2;
+        VersionRequest hardware_version = 3;
+    }
+}
+
+message ControlResponse {
+    oneof response {
+        Version firmware_version = 1;
+        Version hardware_version = 2;
+    }
+}
