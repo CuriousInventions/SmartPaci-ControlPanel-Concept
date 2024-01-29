@@ -1,7 +1,7 @@
 import { writable } from 'svelte/store';
 
 export interface ToastConfig {
-	intent: 'info' | 'error';
+	intent: 'info' | 'error' | 'success';
 	title?: string;
 	message?: string;
 	/** How long should the toast show for in ms */
