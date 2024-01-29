@@ -4,11 +4,26 @@
 	import LoadingBar from '$lib/components/utils/LoadingBar.svelte';
 
 	import paciStore from '$lib/stores/paciStore';
+	import toastStore from '$lib/stores/toastStore';
 
 	/** True whenever the paci is connected or reconnecting*/
 	let showAsConnected = false;
 	const showConnectedStates = ['connected', 'reconnecting'];
 	$: showAsConnected = showConnectedStates.includes($paciStore.connectionState);
+
+	const connectPaci = async () => {
+		try {
+			await paciStore.connect();
+		} catch (error) {
+			console.log(error);
+			toastStore.post({
+				intent: 'error',
+				title: 'Failed to initialize Bluetooth',
+				message:
+					'Please ensure that both your device and web browser supports the Web Bluetooth API. We reccomend using a Chromium based browser such as Edge or Google Chrome.'
+			});
+		}
+	};
 </script>
 
 <Container>
@@ -36,7 +51,7 @@
 						>
 					{:else}
 						<button
-							on:click={paciStore.connect}
+							on:click={connectPaci}
 							disabled={$paciStore.connectionState !== 'disconnected'}
 							class="bg-green-600/90 hover:bg-green-600/100 p-2 w-full rounded text-white mb-1 disabled:bg-green-800/100 disabled:cursor-wait"
 							>{#if $paciStore.connectionState === 'connecting'}

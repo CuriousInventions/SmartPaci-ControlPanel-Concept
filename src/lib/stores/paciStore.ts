@@ -102,7 +102,7 @@ const actions = {
 			await paci.connect();
 		} catch (err) {
 			update((state) => ({ ...state, connectionState: 'disconnected' }));
-			console.log(err);
+			throw err;
 		}
 	},
 	disconnect: () => {
