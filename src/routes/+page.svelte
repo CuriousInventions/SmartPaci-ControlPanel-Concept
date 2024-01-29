@@ -4,7 +4,7 @@
 	import LoadingBar from '$lib/components/utils/LoadingBar.svelte';
 
 	import paciStore from '$lib/stores/paciStore';
-	import toastStore from '$lib/stores/toastStore';
+	import toastStore, { type ToastConfig } from '$lib/stores/toastStore';
 
 	/** True whenever the paci is connected or reconnecting*/
 	let showAsConnected = false;
@@ -14,14 +14,42 @@
 	const connectPaci = async () => {
 		try {
 			await paciStore.connect();
+			toastStore.post({
+				intent: 'success',
+				title: 'Successfully connected',
+				duration: 5000
+			});
 		} catch (error) {
 			console.log(error);
-			toastStore.post({
-				intent: 'error',
-				title: 'Failed to initialize Bluetooth',
-				message:
-					'Please ensure that both your device and web browser supports the Web Bluetooth API. We reccomend using a Chromium based browser such as Edge or Google Chrome.'
-			});
+			if (error instanceof DOMException) {
+				const toast: ToastConfig = {
+					intent: 'error',
+					title: 'Failed to initialize Bluetooth'
+				};
+
+				switch (error.name) {
+					case 'NotFoundError':
+						toast.title += ': No devices found';
+						toast.message =
+							'Either you did not select a device, or your web browser/device does not support Web Bluetooth. We reccomend using a Chromium based browser such as Edge or Google Chrome.';
+						break;
+					case 'NetworkError':
+						toast.title += ': Connection Error';
+						toast.message = 'The connection was interrupted.';
+						break;
+
+					default:
+						toast.message = 'An unknown error occurred: ' + error.name;
+						break;
+				}
+				toastStore.post(toast);
+			} else {
+				toastStore.post({
+					intent: 'error',
+					title: 'Failed to initialize Bluetooth',
+					message: 'An unknown error occurred.'
+				});
+			}
 		}
 	};
 </script>
