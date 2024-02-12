@@ -8,5 +8,5 @@ node_modules
 !.env.example
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
-/static/generated/*
-!/static/generated/.gitkeep
+./src/lib/smartpaci/generated/*
+!./src/lib/smartpaci/generated/.gitkeep
