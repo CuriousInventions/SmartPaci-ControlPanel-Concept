@@ -2,6 +2,7 @@
 	import Container from '$lib/components/layout/Container.svelte';
 	import Loader from '$lib/components/utils/Loader.svelte';
 	import LoadingBar from '$lib/components/utils/LoadingBar.svelte';
+	import FirmwareUpdate from '$lib/components/page/settings/FirmwareUpdate.svelte';
 
 	import paciStore from '$lib/stores/paciStore';
 	import toastStore, { type ToastConfig } from '$lib/stores/toastStore';
@@ -91,18 +92,7 @@
 					{/if}
 				</div>
 			</div>
-			<div class="bg-gradient-to-tr from-blue-600/40 to-sky-400/40 rounded-md p-[2px]">
-				<div class="bg-slate-50 rounded p-3 text-slate-800">
-					<h2 class="text-lg font-comforta font-extrabold mb-1">MCU Management</h2>
-					{#if $paciStore.connectionState === 'connected'}
-						<button class="bg-sky-600/90 hover:bg-sky-600 p-2 w-full rounded text-white"
-							>Update</button
-						>
-					{:else}
-						<div class="text-xs text-slate-800/50">Please connect your Smart Paci</div>
-					{/if}
-				</div>
-			</div>
+			<FirmwareUpdate />
 		</div>
 		<div class="w-full md:w-8/12 xl:w-8/12 md:pl-4">
 			<div class="bg-gradient-to-tr from-slate-400 to-slate-300 h-52 mb-3 rounded"></div>
