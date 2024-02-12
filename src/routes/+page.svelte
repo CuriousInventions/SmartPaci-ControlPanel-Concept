@@ -6,6 +6,7 @@
 
 	import paciStore from '$lib/stores/paciStore';
 	import toastStore, { type ToastConfig } from '$lib/stores/toastStore';
+	import PaciPreview from '$lib/components/page/settings/PaciPreview.svelte';
 
 	/** True whenever the paci is connected or reconnecting*/
 	let showAsConnected = false;
@@ -95,7 +96,11 @@
 			<FirmwareUpdate />
 		</div>
 		<div class="w-full md:w-8/12 xl:w-8/12 md:pl-4">
-			<div class="bg-gradient-to-tr from-slate-400 to-slate-300 h-52 mb-3 rounded"></div>
+			<div
+				class="bg-gradient-to-tr from-slate-400 to-slate-200 mb-3 rounded flex justify-center p-6"
+			>
+				<PaciPreview />
+			</div>
 			<div class="bg-gradient-to-tr from-blue-600/40 to-sky-400/40 rounded-md p-[2px] mb-3">
 				<div class="bg-slate-50 rounded p-3 text-slate-800">
 					<h2 class="text-lg font-comforta font-extrabold mb-1">Sensor Values</h2>
