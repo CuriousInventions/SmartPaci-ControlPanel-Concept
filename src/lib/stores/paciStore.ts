@@ -1,15 +1,5 @@
 import { get, writable } from 'svelte/store';
 import { Paci } from '$lib/smartpaci/paci';
-import { type McuImageInfo } from '$lib/smartpaci/mcumgr';
-
-interface DeviceInfo {
-	name: string;
-	firmware: {
-		version: string;
-		commit: string;
-		buildDate: string;
-	};
-}
 
 interface PaciState {
 	connectionState: 'disconnected' | 'connecting' | 'connected' | 'reconnecting';
@@ -50,6 +40,9 @@ const { update, subscribe } = state;
 
 const paci = new Paci();
 
+// HOOKS
+const biteHooks: Array<(value: number) => void> = [];
+
 // CONNECTION STATE SYNCING
 paci.addEventListener('connected', async () => {
 	const name = await paci.getName();
@@ -86,10 +79,13 @@ paci.addEventListener('disconnected', async () => {
 
 // SENSOR SYNCING
 paci.addEventListener('bite', (event) => {
+	const normalized = event.detail.value / 255;
 	update((state) => ({
 		...state,
-		sensors: { ...state.sensors, bite: (event.detail.value / 255) * 100 }
+		sensors: { ...state.sensors, bite: normalized * 100 }
 	}));
+
+	biteHooks.forEach((hook) => hook(normalized));
 });
 
 // ACTIONS
@@ -107,6 +103,28 @@ const actions = {
 	},
 	disconnect: () => {
 		paci.disconnect();
+	},
+	hook: {
+		/** Triggered each time the Paci sends updated bite values */
+		onBite: {
+			/**
+			 * Registers an onBite hook.
+			 * @param callback The callback's value parameter will recieve a normalized value between 0 and 1, depending on the bite strength.
+			 */
+			register: (callback: (value: number) => void) => {
+				biteHooks.push(callback);
+			},
+			/**
+			 * Removes an onBite hook.
+			 * @param callback
+			 */
+			deregister: (callback: (value: number) => void) => {
+				const index = biteHooks.findIndex((hook) => hook === callback);
+				if (index !== -1) {
+					biteHooks.splice(index, 1);
+				}
+			}
+		}
 	}
 };
 
