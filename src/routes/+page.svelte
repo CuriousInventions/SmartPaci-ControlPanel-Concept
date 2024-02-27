@@ -2,6 +2,7 @@
 	import Container from '$lib/components/layout/Container.svelte';
 	import Loader from '$lib/components/utils/Loader.svelte';
 	import LoadingBar from '$lib/components/utils/LoadingBar.svelte';
+	import ButtplugIoConnector from '$lib/components/page/settings/ButtplugIOConnector.svelte';
 	import FirmwareUpdate from '$lib/components/page/settings/FirmwareUpdate.svelte';
 
 	import paciStore from '$lib/stores/paciStore';
@@ -93,7 +94,10 @@
 					{/if}
 				</div>
 			</div>
-			<FirmwareUpdate />
+			<div class="mb-3">
+				<FirmwareUpdate />
+			</div>
+			<ButtplugIoConnector />
 		</div>
 		<div class="w-full md:w-8/12 xl:w-8/12 md:pl-4">
 			<div
