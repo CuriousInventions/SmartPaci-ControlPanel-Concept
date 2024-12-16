@@ -1,46 +1,23 @@
 <script lang="ts">
-	import { McuManager, type McuImageInfo } from '$lib/smartpaci/mcumgr';
-	import { fromSemVersion } from '$lib/smartpaci/paci';
+	import { Paci, type FirmwareInfo } from '$lib/smartpaci/paci';
 
 	import paciStore from '$lib/stores/paciStore';
-	import { toHex } from '@smithy/util-hex-encoding';
 
 	let firmwareFileInput: HTMLInputElement;
 
-	let firmwareInfo: McuImageInfo;
+	let firmwareInfo: FirmwareInfo;
 
 	const handleFirmwareFileChange = async () => {
 		try {
 			const file = firmwareFileInput.files?.item(0);
 			if (file == null) return;
 
-			if (file.size > 10_000_000) throw new Error('File is too large.');
-
-			const manager = new McuManager();
-			const fileData = await file.arrayBuffer();
-			firmwareInfo = await manager.imageInfo(fileData);
-			// const version = fromSemVersion(firmwareInfo.version);
-
-			if (!firmwareInfo.hashValid) throw new Error(`Invalid hash: ${toHex(firmwareInfo.hash)}`);
+			firmwareInfo = await Paci.getFirmwareInfo(file);
 		} catch (err) {
 			console.log(err);
 		}
 	};
 
-	const formatCommitString = (firmwareInfo: McuImageInfo): string => {
-		return 0xa0 in firmwareInfo.tags ? toHex(firmwareInfo.tags[0xa0]) : '(unavailable)';
-	};
-
-	const formatBuiltString = (firmwareInfo: McuImageInfo): Date => {
-		let padded_timestamp = Uint8Array.from([
-			...Array(8 - firmwareInfo.tags[0xa1]?.length ?? 0).fill(0),
-			...(firmwareInfo.tags[0xa1] ?? [])
-		]);
-
-		const timestamp = new DataView(padded_timestamp.buffer).getBigUint64(0);
-		const date = new Date(Number(timestamp) * 1000);
-		return date;
-	};
 </script>
 
 <div class="bg-gradient-to-tr from-blue-600/40 to-sky-400/40 rounded-md p-[2px]">
@@ -64,11 +41,11 @@
 				<div class="mb-3 bg-slate-200 p-2 rounded">
 					<p class="font-bold">Firmare info</p>
 					<p>
-						Version: {fromSemVersion(firmwareInfo?.version)}<br />
-						Hash: <samp>{toHex(firmwareInfo?.hash)}</samp><br />
+						Version: {firmwareInfo?.version}<br />
+						Hash: <samp>{firmwareInfo?.hash}</samp><br />
 						Commit:
-						<samp>{formatCommitString(firmwareInfo)}</samp><br />
-						Built: <et>{formatBuiltString(firmwareInfo)}</et>
+						<samp>{firmwareInfo?.version.commit}</samp><br />
+						Built: <et>{firmwareInfo.version.datetime}</et>
 					</p>
 				</div>
 			{/if}

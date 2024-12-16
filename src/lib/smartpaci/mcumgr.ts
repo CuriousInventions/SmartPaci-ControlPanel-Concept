@@ -51,7 +51,7 @@ export interface McuMgrMessage {
     readonly op: number;
     readonly group: number;
     readonly id: number;
-    readonly data: number;
+    readonly data: {images: McuImageStat[]}|any;
     readonly length: number;
 }
 
@@ -60,6 +60,21 @@ export type SemVersion = {
     minor: number;
     revision: number;
     build: number;
+}
+
+export interface McuImageStat {
+    /** Is the current image actively running. */
+    readonly active: boolean;
+    readonly bootable: boolean;
+    /** If the image is not confirmed, the bootloader will revert to the other image on reboot. */
+    readonly confirmed: boolean;
+    /** The SHA256 hash of the firmware image. */
+    readonly hash: Uint8Array;
+    /** If true, the bootloader will boot into this image on next reboot. */
+    readonly pending: boolean;
+    readonly permanent: boolean;
+    readonly slot: number;
+    readonly version: SemVersion;
 }
 
 export type McuImageInfo = {
@@ -106,7 +121,7 @@ export class McuManager extends typedEventTarget {
     private _device: BluetoothDevice | null;
     private _service: BluetoothRemoteGATTService | null;
     private _characteristic: BluetoothRemoteGATTCharacteristic | null;
-    
+
     private _uploadIsInProgress: boolean;
     private _buffer: Uint8Array;
     private _logger: Logger ;
@@ -123,7 +138,7 @@ export class McuManager extends typedEventTarget {
         this._device = null;
         this._service = null;
         this._characteristic = null;
-        
+
         this._uploadIsInProgress = false;
         this._buffer = new Uint8Array();
         this._logger = { info: console.log, error: console.error };
@@ -140,7 +155,7 @@ export class McuManager extends typedEventTarget {
                 acceptAllDevices: true,
                 optionalServices: [McuManager.SERVICE_UUID],
             }
-            : { 
+            : {
                 optionalServices: [McuManager.SERVICE_UUID],
                 filters: filters,
                 acceptAllDevices: false,
@@ -181,7 +196,7 @@ export class McuManager extends typedEventTarget {
             try {
                 if (!this._device?.gatt)
                     throw new Error("No GATT Service or Device selected");
-                
+
                 const server = this._device.gatt;
                 if (!this._device.gatt.connected) {
                     this.dispatchEvent(new Event('connecting'));
@@ -209,7 +224,7 @@ export class McuManager extends typedEventTarget {
         this._userRequestedDisconnect = true;
         return this._device?.gatt?.disconnect();
     }
-    
+
     private _connected() {
         this.dispatchEvent(new Event('connteded'));
     }
@@ -229,7 +244,7 @@ export class McuManager extends typedEventTarget {
         return this._device?.name ?? null;
     }
 
-    private async _sendMessage(op: number, group: number, id: number, data?: any) {
+    private async _sendMessage(op: number, group: number, id: number, data?: any): Promise<void> {
         const _flags = 0;
         let encodedData: number[] = [];
         if (data) {
@@ -246,13 +261,13 @@ export class McuManager extends typedEventTarget {
         await this._characteristic!.writeValueWithoutResponse(Uint8Array.from(message));
         this._seq = (this._seq + 1) % 256;
     }
-    
+
     private _notification(event: Event) {
         const target = event.target as BluetoothRemoteGATTCharacteristic;
         const message = new Uint8Array(target.value!.buffer);
         this._buffer = new Uint8Array([...this._buffer, ...message]);
         const messageLength = this._buffer[2] * 256 + this._buffer[3];
-        
+
         // this._logger.info('<'  + [...message].map(x => x.toString(16).padStart(2, '0')).join(' '));
         if (this._buffer.length < messageLength + McuManager.SMP_HEADER_SIZE) {
             this._logger.error("Ignoring message?!");
@@ -281,27 +296,27 @@ export class McuManager extends typedEventTarget {
         this.dispatchEvent(new CustomEvent('message', {detail: { op, group, id, data, length }}));
     }
 
-    cmdReset() {
+    cmdReset(): Promise<void> {
         return this._sendMessage(OpCode.Write, GroupId.OS, GroupOSId.Reset);
     }
-    
-    smpEcho(message: string) {
+
+    smpEcho(message: string): Promise<void> {
         return this._sendMessage(OpCode.Write, GroupId.OS, GroupOSId.Echo, { d: message });
     }
-    
-    cmdImageState() {
+
+    cmdImageState(): Promise<void> {
         return this._sendMessage(OpCode.Read, GroupId.Image, GroupImageId.State);
     }
-    
-    cmdImageErase() {
+
+    cmdImageErase(): Promise<void> {
         return this._sendMessage(OpCode.Write, GroupId.Image, GroupImageId.Erase, {});
     }
-    
-    cmdImageTest(hash: Uint8Array) {
+
+    cmdImageTest(hash: Uint8Array): Promise<void> {
         return this._sendMessage(OpCode.Write, GroupId.Image, GroupImageId.State, { hash, confirm: false });
     }
-    
-    cmdImageConfirm(hash: Uint8Array) {
+
+    cmdImageConfirm(hash: Uint8Array): Promise<void> {
         return this._sendMessage(OpCode.Write, GroupId.Image, GroupImageId.State, { hash, confirm: true });
     }
 
@@ -349,7 +364,7 @@ export class McuManager extends typedEventTarget {
 
         await this._sendMessage(OpCode.Write, GroupId.Image, GroupImageId.Upload, message);
     }
-    
+
     async cmdUpload(image: ArrayBuffer, slot = 0) {
         if (this._uploadIsInProgress) {
             this._logger.error('Upload is already in progress.');
@@ -373,7 +388,7 @@ export class McuManager extends typedEventTarget {
             offset += 4;
             const data = view.buffer.slice(offset, offset + len);
             offset += len;
-            
+
             yield {tag, value: new Uint8Array(data)};
         }
     }
@@ -420,7 +435,7 @@ export class McuManager extends typedEventTarget {
             revision: view.getUint16(22, littleEndian),
             build: view.getUint32(24, littleEndian),
         };
-        
+
         const hash = new Uint8Array(await this._hash(image.slice(0, headerSize + imageSize + protected_tlv_lenth)));
         const info = {version, hash, hashValid:false, imageSize, tags: []} as McuImageInfo;
 
@@ -436,7 +451,7 @@ export class McuManager extends typedEventTarget {
             }
             offset = tlv_end;
         }
-        
+
         if (view.getUint16(offset, littleEndian) !== 0x6907)
             throw new Error(`Expected TLV magic number. (0x${offset.toString(16)}: 0x${view.getUint16(offset, littleEndian).toString(16)})`);
 
