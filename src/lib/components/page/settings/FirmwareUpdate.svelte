@@ -1,20 +1,27 @@
 <script lang="ts">
 	import { Paci, type FirmwareInfo } from '$lib/smartpaci/paci';
+	import { Badge, Button, Fileupload, Input, Helper } from 'flowbite-svelte'
+
+	import { Copy as CopyIcon } from 'svelte-feathers';
 
 	import paciStore from '$lib/stores/paciStore';
+	import toastStore  from '$lib/stores/toastStore';'$lib/stores/toastStore';
 
-	let firmwareFileInput: HTMLInputElement;
-
+	let firmwareFileError: string = "";
 	let firmwareInfo: FirmwareInfo;
 
-	const handleFirmwareFileChange = async () => {
+	const handleFirmwareFileChange = async (event: Event) => {
+		firmwareFileError = ""
 		try {
-			const file = firmwareFileInput.files?.item(0);
+			const file = (event.target as HTMLInputElement).files?.item(0);
 			if (file == null) return;
 
 			firmwareInfo = await Paci.getFirmwareInfo(file);
+			if (!firmwareInfo.hashValid)
+				firmwareFileError = "Invalid file has been provided"
 		} catch (err) {
 			console.log(err);
+			firmwareFileError = (err as Error).message;
 		}
 	};
 
@@ -26,45 +33,55 @@
 		{#if $paciStore.connectionState === 'connected' || true}
 			<div class="mb-2">
 				<label class="block mb-1 text-sm font-medium" for="fileFirmware">Firmware Image</label>
-				<input
-					class="block w-full text-sm text-gray-900 border border-gray-300 rounded cursor-pointer bg-gray-50"
+				<Fileupload
+					class="block w-full rounded bg-slate-200"
+					size="sm"
+					color={firmwareFileError == "" ? 'base' : 'red'}
 					aria-describedby="fileFirmwareHelp"
 					id="fileFirmware"
 					type="file"
 					accept=".dfu,.bin"
-					bind:this={firmwareFileInput}
 					on:change={handleFirmwareFileChange}
 				/>
+				{#if firmwareFileError != ""}
+					<Helper class="mt-2" color="red">
+						<span class="font-medium">Heck!</span>
+						{firmwareFileError}
+					</Helper>
+				{/if}
 				<p class="mt-1 text-sm text-gray-500" id="fileFirmwareHelp">.dfu or .bin</p>
 			</div>
-			{#if firmwareInfo && firmwareInfo.hashValid}
+			{#if firmwareInfo}
 				<div class="mb-3 bg-slate-200 p-2 rounded">
-					<p class="font-bold">Firmare info</p>
+					<p class="font-bold">
+						Firmware info
+						{#if firmwareInfo.hashValid}
+							<Badge rounded color="green">Valid</Badge>
+						{:else}
+							<Badge rounded color="red">Invalid</Badge>
+						{/if}
+					</p>
 					<p>
 						Version: {firmwareInfo?.version}<br />
-						Hash: <samp>{firmwareInfo?.hash}</samp><br />
+						Hash:
+						<span title="{firmwareInfo?.hash}"><samp>{firmwareInfo?.hash.slice(0, 12)}</samp>&hellip;</span>
+						<Button outline={true} color="light" class="!p-2" size="xs" on:click={() => {navigator.clipboard.writeText(firmwareInfo?.hash); toastStore.post({intent: 'info', title: 'Copied to Clipboard!', duration: 1000})}}>
+							<CopyIcon class="w-4 h-4 text-primary-600"/>
+						</Button>
+						<br />
 						Commit:
-						<samp>{firmwareInfo?.version.commit}</samp><br />
-						Built: <et>{firmwareInfo.version.datetime}</et>
+						<span title="{firmwareInfo?.version.commit}"><samp>{firmwareInfo?.version.commit.slice(0, 12)}</samp>&hellip;</span>
+						<Button outline={true} color="light" class="!p-2" size="xs" on:click={() => {navigator.clipboard.writeText(firmwareInfo?.version.commit); toastStore.post({intent: 'info', title: 'Copied to Clipboard!', duration: 1000})}}>
+							<CopyIcon class="w-4 h-4 text-primary-600" />
+						</Button>
+						<br />
+						Built: <et>{firmwareInfo.version.datetime.toDateString()} {firmwareInfo.version.datetime.toLocaleTimeString()}</et>
 					</p>
 				</div>
 			{/if}
-			<button class="bg-sky-600/90 hover:bg-sky-600 p-2 w-full rounded text-white">Update</button>
+			<Button color="primary" class="bg-sky-600 rounded p-2 w-full ">Update</Button>
 		{:else}
 			<div class="text-xs text-slate-800/50">Please connect your Smart Paci</div>
 		{/if}
 	</div>
 </div>
-
-<style>
-	#fileFirmware::file-selector-button {
-		@apply py-2;
-		@apply px-3;
-		@apply border-none;
-		@apply bg-slate-200;
-		@apply cursor-pointer;
-	}
-	#fileFirmware:hover::file-selector-button {
-		@apply bg-slate-300/70;
-	}
-</style>

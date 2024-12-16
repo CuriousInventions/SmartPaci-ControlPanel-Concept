@@ -21,7 +21,6 @@
 
 	const loadHandler = () => {
 		paciStore.subscribe((state) => {
-			console.debug(`Touch sensors are now [${state.sensors.touch}]`);
 			touchpadElements.forEach((touchpadElement, index) => {
 				let touchpadShape = touchpadElement?.querySelector('path');
 
