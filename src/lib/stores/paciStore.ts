@@ -13,6 +13,7 @@ interface PaciState {
 	} | null;
 	sensors: {
 		bite: number;
+		touch: number[];
 	};
 	// firmwareInfo: McuImageInfo | null;
 	// firmwareFile: File | null;
@@ -27,7 +28,8 @@ const initialState: PaciState = {
 	connectionState: 'disconnected',
 	deviceInfo: null,
 	sensors: {
-		bite: 0
+		bite: 0,
+		touch: [],
 	}
 	// firmwareFile: null,
 	// version: '',
@@ -75,6 +77,17 @@ paci.addEventListener('reconnecting', async () => {
 
 paci.addEventListener('disconnected', async () => {
 	update((state) => ({ ...state, connectionState: 'disconnected', deviceInfo: null }));
+});
+
+paci.addEventListener('touch', async (event) => {
+	const values = event.detail.values;
+	update((state) => ({
+		...state,
+			sensors: {
+				...state.sensors,
+				touch: values
+			}
+	}));
 });
 
 // SENSOR SYNCING
