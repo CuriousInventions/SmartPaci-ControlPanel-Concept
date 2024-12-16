@@ -9,35 +9,35 @@
 
 	let touchpadElements: TouchpadElements = [];
 
+	function getTouchPadElements(): void {
+		const paciSvg: Document = paciSvgRef.contentDocument!;
+		touchpadElements = [
+			paciSvg.getElementById('touchpad-bottom-left') as SVGElement | null,
+			paciSvg.getElementById('touchpad-top-left') as SVGElement | null,
+			paciSvg.getElementById('touchpad-top-right') as SVGElement | null,
+			paciSvg.getElementById('touchpad-bottom-right') as SVGElement | null
+		];
+	}
+
 	const loadHandler = () => {
 		paciStore.subscribe((state) => {
 			console.debug(`Touch sensors are now [${state.sensors.touch}]`);
 			touchpadElements.forEach((touchpadElement, index) => {
 				let touchpadShape = touchpadElement?.querySelector('path');
 
-				if(touchpadShape)
+				if(touchpadShape) {
+					touchpadShape.style.transition = 'fill-opacity 100ms ease';
 					touchpadShape.style.fillOpacity = state.sensors.touch.includes(index) ? '1' : '0';
-			});
-		});
+				}
 
-		paciSvgRef.addEventListener('load', () => {
-			const paciSvg: Document = paciSvgRef.contentDocument!;
-			touchpadElements = [
-				paciSvg.getElementById('touchpad-bottom-left') as SVGElement | null,
-				paciSvg.getElementById('touchpad-top-left') as SVGElement | null,
-				paciSvg.getElementById('touchpad-top-right') as SVGElement | null,
-				paciSvg.getElementById('touchpad-bottom-right') as SVGElement | null
-			];
-
-			console.debug(touchpadElements);
-			touchpadElements.forEach((e) => {
-				if (e)
-					e.style.transition = 'fill-opacity 500ms ease';
 			});
 		});
 	};
 
 	onMount(() => {
+		getTouchPadElements();
+		// Also fetch the elements if the svg itself gets reloaded...
+		paciSvgRef.addEventListener('load', () => getTouchPadElements());
 		loadHandler();
 	});
 </script>
