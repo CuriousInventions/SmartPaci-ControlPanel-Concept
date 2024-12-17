@@ -24,11 +24,10 @@
 			touchpadElements.forEach((touchpadElement, index) => {
 				let touchpadShape = touchpadElement?.querySelector('path');
 
-				if(touchpadShape) {
+				if (touchpadShape) {
 					touchpadShape.style.transition = 'fill-opacity 100ms ease';
 					touchpadShape.style.fillOpacity = state.sensors.touch.includes(index) ? '1' : '0';
 				}
-
 			});
 		});
 	};

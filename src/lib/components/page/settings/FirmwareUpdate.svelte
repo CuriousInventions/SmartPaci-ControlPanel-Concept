@@ -1,30 +1,28 @@
 <script lang="ts">
 	import { Paci, type FirmwareInfo } from '$lib/smartpaci/paci';
-	import { Badge, Button, Fileupload, Input, Helper } from 'flowbite-svelte'
+	import { Badge, Button, Fileupload, Input, Helper } from 'flowbite-svelte';
 
 	import { Copy as CopyIcon } from 'svelte-feathers';
 
 	import paciStore from '$lib/stores/paciStore';
-	import toastStore  from '$lib/stores/toastStore';'$lib/stores/toastStore';
+	import toastStore from '$lib/stores/toastStore';
 
-	let firmwareFileError: string = "";
+	let firmwareFileError: string = '';
 	let firmwareInfo: FirmwareInfo;
 
 	const handleFirmwareFileChange = async (event: Event) => {
-		firmwareFileError = ""
+		firmwareFileError = '';
 		try {
 			const file = (event.target as HTMLInputElement).files?.item(0);
 			if (file == null) return;
 
 			firmwareInfo = await Paci.getFirmwareInfo(file);
-			if (!firmwareInfo.hashValid)
-				firmwareFileError = "Invalid file has been provided"
+			if (!firmwareInfo.hashValid) firmwareFileError = 'Invalid file has been provided';
 		} catch (err) {
 			console.log(err);
 			firmwareFileError = (err as Error).message;
 		}
 	};
-
 </script>
 
 <div class="bg-gradient-to-tr from-blue-600/40 to-sky-400/40 rounded-md p-[2px]">
@@ -36,14 +34,14 @@
 				<Fileupload
 					class="block w-full rounded bg-slate-200"
 					size="sm"
-					color={firmwareFileError == "" ? 'base' : 'red'}
+					color={firmwareFileError == '' ? 'base' : 'red'}
 					aria-describedby="fileFirmwareHelp"
 					id="fileFirmware"
 					type="file"
 					accept=".dfu,.bin"
 					on:change={handleFirmwareFileChange}
 				/>
-				{#if firmwareFileError != ""}
+				{#if firmwareFileError != ''}
 					<Helper class="mt-2" color="red">
 						<span class="font-medium">Heck!</span>
 						{firmwareFileError}
@@ -64,18 +62,44 @@
 					<p>
 						Version: {firmwareInfo?.version}<br />
 						Hash:
-						<span title="{firmwareInfo?.hash}"><samp>{firmwareInfo?.hash.slice(0, 12)}</samp>&hellip;</span>
-						<Button outline={true} color="light" class="!p-2" size="xs" on:click={() => {navigator.clipboard.writeText(firmwareInfo?.hash); toastStore.post({intent: 'info', title: 'Copied to Clipboard!', duration: 1000})}}>
-							<CopyIcon class="w-4 h-4 text-primary-600"/>
-						</Button>
-						<br />
-						Commit:
-						<span title="{firmwareInfo?.version.commit}"><samp>{firmwareInfo?.version.commit.slice(0, 12)}</samp>&hellip;</span>
-						<Button outline={true} color="light" class="!p-2" size="xs" on:click={() => {navigator.clipboard.writeText(firmwareInfo?.version.commit); toastStore.post({intent: 'info', title: 'Copied to Clipboard!', duration: 1000})}}>
+						<span title={firmwareInfo?.hash}
+							><samp>{firmwareInfo?.hash.slice(0, 12)}</samp>&hellip;</span
+						>
+						<Button
+							outline={true}
+							color="light"
+							class="!p-2"
+							size="xs"
+							on:click={() => {
+								navigator.clipboard.writeText(firmwareInfo?.hash);
+								toastStore.post({ intent: 'info', title: 'Copied to Clipboard!', duration: 1000 });
+							}}
+						>
 							<CopyIcon class="w-4 h-4 text-primary-600" />
 						</Button>
 						<br />
-						Built: <et>{firmwareInfo.version.datetime.toDateString()} {firmwareInfo.version.datetime.toLocaleTimeString()}</et>
+						Commit:
+						<span title={firmwareInfo?.version.commit}
+							><samp>{firmwareInfo?.version.commit.slice(0, 12)}</samp>&hellip;</span
+						>
+						<Button
+							outline={true}
+							color="light"
+							class="!p-2"
+							size="xs"
+							on:click={() => {
+								navigator.clipboard.writeText(firmwareInfo?.version.commit);
+								toastStore.post({ intent: 'info', title: 'Copied to Clipboard!', duration: 1000 });
+							}}
+						>
+							<CopyIcon class="w-4 h-4 text-primary-600" />
+						</Button>
+						<br />
+						Built:
+						<et
+							>{firmwareInfo.version.datetime.toDateString()}
+							{firmwareInfo.version.datetime.toLocaleTimeString()}</et
+						>
 					</p>
 				</div>
 			{/if}
