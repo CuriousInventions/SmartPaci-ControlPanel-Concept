@@ -511,11 +511,6 @@ export class Paci extends typedEventTarget {
 		return await p;
 	}
 
-	async uploadFirmwareFile(firmware: File): Promise<void> {
-		this._firmwareFileInfo = await Paci.getFirmwareInfo(firmware);
-		await this.mcuManager.cmdUpload(await firmware.arrayBuffer());
-	}
-
 	private async _waitMcuMgrResponse(groupId: number, messageId: number): Promise<McuMgrMessage> {
 		return new Promise((resolve, reject) => {
 			this._mcuManager.addEventListener(
@@ -537,6 +532,20 @@ export class Paci extends typedEventTarget {
 				{ once: true },
 			);
 		});
+	}
+
+	async uploadFirmwareFile(firmware: File): Promise<void> {
+		this._firmwareFileInfo = await Paci.getFirmwareInfo(firmware);
+		const statResponse = this._waitMcuMgrResponse(GroupId.Image, GroupImageId.State).then(
+			(message) => {
+				const images = message.data.images as McuImageStat[];
+				if (toHex(images[0].hash) == this._firmwareFileInfo!.hash)
+					throw new Error('Cannot upload the same firmware that is already on the device.');
+			},
+		);
+		await this.mcuManager.cmdImageState();
+		await statResponse;
+		await this.mcuManager.cmdUpload(await firmware.arrayBuffer());
 	}
 
 	// Select the firmware that's in the uploaded slot and attempt to reboot into it.

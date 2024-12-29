@@ -38,6 +38,11 @@
 		}
 	};
 
+	async function openFirmwareUploadModal(): Promise<void> {
+		paciStore.clearFirmwareUpload();
+		firmwareUploadOpen = true;
+		firmwareUploadStarted = false;
+	}
 	async function startFirmwareUpload(): Promise<void> {
 		if (firmwareFile == null || $paciStore.connectionState != 'connected') return;
 		await paciStore.uploadFirmware(firmwareFile);
@@ -137,7 +142,7 @@
 				color="primary"
 				class="bg-sky-600 rounded p-2 w-full "
 				disabled={firmwareInfo == null}
-				on:click={() => (firmwareUploadOpen = true)}>Update</Button
+				on:click={openFirmwareUploadModal}>Update</Button
 			>
 		{:else}
 			<div class="text-xs text-slate-800/50">Please connect your Smart Paci</div>
@@ -150,7 +155,7 @@
 	title="Firmware Upload"
 	bind:open={firmwareUploadOpen}
 	dismissable={false}
-	classFooter={$paciStore.ota?.state != null ? 'collapse' : ''}
+	classFooter={$paciStore.ota?.state != null && $paciStore.ota?.state != 'failed' ? 'collapse' : ''}
 >
 	{#if $paciStore.ota?.state == null}
 		{#if !firmwareUploadStarted}
@@ -165,13 +170,8 @@
 				</ul>
 			</Alert>
 			<p>Are you sure you want to proceed?</p>
-		{:else if firmwareInfo?.hash == $paciStore.deviceInfo?.firmware.hash}
-			<p>All done! 🎉</p>
 		{:else}
-			<p>
-				Something appears to gave gone wrong. The device isn't running the firmware we just
-				uploaded...
-			</p>
+			<p>All done! 🎉</p>
 		{/if}
 	{:else if $paciStore.ota?.state == 'uploading'}
 		<p>This may take several minutes. Please be patient.</p>
@@ -182,6 +182,11 @@
 		{/if}
 	{:else if $paciStore.ota?.state == 'restarting'}
 		<p>Give it a minute while the device updates...</p>
+	{:else if $paciStore.ota.state == 'failed'}
+		<p>Something appears to gave gone wrong.</p>
+		<Alert class="alert-warning" color="yellow">
+			{$paciStore.ota.reason}
+		</Alert>
 	{/if}
 	<svelte:fragment slot="footer">
 		{#if $paciStore.ota?.state == null}
@@ -192,11 +197,11 @@
 					on:click={startFirmwareUpload}
 					disabled={$paciStore.connectionState != 'connected'}>Proceed</Button
 				>
-			{:else if firmwareInfo?.hash == $paciStore.deviceInfo?.firmware.hash}
-				<Button color="green" on:click={() => (firmwareUploadOpen = false)}>Close</Button>
 			{:else}
-				<Button color="red" on:click={() => (firmwareUploadOpen = false)}>Close</Button>
+				<Button color="green" on:click={() => (firmwareUploadOpen = false)}>Close</Button>
 			{/if}
+		{:else if $paciStore.ota.state == 'failed'}
+			<Button color="red" on:click={() => (firmwareUploadOpen = false)}>Close</Button>
 		{/if}
 	</svelte:fragment>
 </Modal>

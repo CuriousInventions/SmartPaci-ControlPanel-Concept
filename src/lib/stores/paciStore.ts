@@ -102,11 +102,19 @@ paci.addEventListener('firmwareUploadProgress', (event) => {
 });
 
 paci.addEventListener('firmwareUploadComplete', async (event) => {
-	await paci.applyFirmwareUpdate();
-	update((state) => ({
-		...state,
-		ota: { state: 'restarting' },
-	}));
+	try {
+		await paci.applyFirmwareUpdate();
+		update((state) => ({
+			...state,
+			ota: { state: 'restarting' },
+		}));
+	} catch (error) {
+		const reason = error instanceof Error ? error.message : 'An unknown problem has happened';
+		update((state) => ({
+			...state,
+			ota: { state: 'failed', reason },
+		}));
+	}
 });
 
 // SENSOR SYNCING
@@ -137,7 +145,22 @@ const actions = {
 		paci.disconnect();
 	},
 	uploadFirmware: async (firmwareFile: File) => {
-		await paci.uploadFirmwareFile(firmwareFile);
+		try {
+			await paci.uploadFirmwareFile(firmwareFile);
+		} catch (error) {
+			const reason = error instanceof Error ? error.message : 'An unknown error occurred';
+
+			update((state) => ({
+				...state,
+				ota: { state: 'failed', reason },
+			}));
+		}
+	},
+	clearFirmwareUpload: () => {
+		update((state) => ({
+			...state,
+			ota: null,
+		}));
 	},
 	hook: {
 		/** Triggered each time the Paci sends updated bite values */
