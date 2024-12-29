@@ -1,28 +1,58 @@
 <script lang="ts">
 	import { Paci, type FirmwareInfo } from '$lib/smartpaci/paci';
-	import { Badge, Button, Fileupload, Input, Helper } from 'flowbite-svelte';
+	import {
+		Badge,
+		Button,
+		Fileupload,
+		Helper,
+		Modal,
+		Alert,
+		Progressbar,
+		Spinner,
+	} from 'flowbite-svelte';
 
 	import { Copy as CopyIcon } from 'svelte-feathers';
 
 	import paciStore from '$lib/stores/paciStore';
 	import toastStore from '$lib/stores/toastStore';
+	import { onMount } from 'svelte';
 
+	let firmwareFile: File | null = null;
 	let firmwareFileError: string = '';
-	let firmwareInfo: FirmwareInfo;
+	let firmwareInfo: FirmwareInfo | null;
+	let firmwareUploadOpen = false;
+	let firmwareUploadStarted = false;
 
 	const handleFirmwareFileChange = async (event: Event) => {
 		firmwareFileError = '';
+		firmwareInfo = null;
 		try {
-			const file = (event.target as HTMLInputElement).files?.item(0);
-			if (file == null) return;
+			firmwareFile = (event.target as HTMLInputElement).files?.item(0) ?? null;
+			if (firmwareFile == null) return;
 
-			firmwareInfo = await Paci.getFirmwareInfo(file);
+			firmwareInfo = await Paci.getFirmwareInfo(firmwareFile);
 			if (!firmwareInfo.hashValid) firmwareFileError = 'Invalid file has been provided';
 		} catch (err) {
 			console.log(err);
 			firmwareFileError = (err as Error).message;
 		}
 	};
+
+	async function startFirmwareUpload(): Promise<void> {
+		if (firmwareFile == null || $paciStore.connectionState != 'connected') return;
+		await paciStore.uploadFirmware(firmwareFile);
+		firmwareUploadStarted = true;
+	}
+
+	onMount(() => {
+		// Try to prevent navigation away from the page.
+		addEventListener('beforeunload', (event) => {
+			if ($paciStore.ota?.state != null) {
+				event.preventDefault();
+				return (event.returnValue = '');
+			}
+		});
+	});
 </script>
 
 <div class="bg-gradient-to-tr from-blue-600/40 to-sky-400/40 rounded-md p-[2px]">
@@ -71,7 +101,7 @@
 							class="!p-2"
 							size="xs"
 							on:click={() => {
-								navigator.clipboard.writeText(firmwareInfo?.hash);
+								navigator.clipboard.writeText(firmwareInfo?.hash ?? '');
 								toastStore.post({ intent: 'info', title: 'Copied to Clipboard!', duration: 1000 });
 							}}
 						>
@@ -88,7 +118,7 @@
 							class="!p-2"
 							size="xs"
 							on:click={() => {
-								navigator.clipboard.writeText(firmwareInfo?.version.commit);
+								navigator.clipboard.writeText(firmwareInfo?.version.commit ?? '');
 								toastStore.post({ intent: 'info', title: 'Copied to Clipboard!', duration: 1000 });
 							}}
 						>
@@ -103,9 +133,70 @@
 					</p>
 				</div>
 			{/if}
-			<Button color="primary" class="bg-sky-600 rounded p-2 w-full ">Update</Button>
+			<Button
+				color="primary"
+				class="bg-sky-600 rounded p-2 w-full "
+				disabled={firmwareInfo == null}
+				on:click={() => (firmwareUploadOpen = true)}>Update</Button
+			>
 		{:else}
 			<div class="text-xs text-slate-800/50">Please connect your Smart Paci</div>
 		{/if}
 	</div>
 </div>
+
+<!-- Firmware Update Modal -->
+<Modal
+	title="Firmware Upload"
+	bind:open={firmwareUploadOpen}
+	dismissable={false}
+	classFooter={$paciStore.ota?.state != null ? 'collapse' : ''}
+>
+	{#if $paciStore.ota?.state == null}
+		{#if !firmwareUploadStarted}
+			<Alert class="alert-warning" color="yellow">
+				<ul>
+					<li>Do not close or refresh this page.</li>
+					<li>
+						This may prevent your paci from operating correctly. For support please contact us at <a
+							href="https://curious.toys/support">https://curious.toys/support</a
+						>
+					</li>
+				</ul>
+			</Alert>
+			<p>Are you sure you want to proceed?</p>
+		{:else if firmwareInfo?.hash == $paciStore.deviceInfo?.firmware.hash}
+			<p>All done! 🎉</p>
+		{:else}
+			<p>
+				Something appears to gave gone wrong. The device isn't running the firmware we just
+				uploaded...
+			</p>
+		{/if}
+	{:else if $paciStore.ota?.state == 'uploading'}
+		<p>This may take several minutes. Please be patient.</p>
+		{#if ($paciStore.ota?.uploadPercent ?? 0) == 0}
+			<p><Spinner />Erasing...</p>
+		{:else}
+			<Progressbar progress={$paciStore.ota?.uploadPercent ?? 0} />
+		{/if}
+	{:else if $paciStore.ota?.state == 'restarting'}
+		<p>Give it a minute while the device updates...</p>
+	{/if}
+	<svelte:fragment slot="footer">
+		{#if $paciStore.ota?.state == null}
+			{#if !firmwareUploadStarted}
+				<Button on:click={() => (firmwareUploadOpen = false)}>Close</Button>
+				<Button
+					color="yellow"
+					on:click={startFirmwareUpload}
+					disabled={$paciStore.connectionState != 'connected'}>Proceed</Button
+				>
+			{:else if firmwareInfo?.hash == $paciStore.deviceInfo?.firmware.hash}
+				<Button color="green" on:click={() => (firmwareUploadOpen = false)}>Close</Button>
+			{:else}
+				<Button color="red" on:click={() => (firmwareUploadOpen = false)}>Close</Button>
+			{/if}
+		{/if}
+	</svelte:fragment>
+</Modal>

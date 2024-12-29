@@ -1,6 +1,12 @@
 import { get, writable } from 'svelte/store';
 import { Paci } from '$lib/smartpaci/paci';
 
+type OtaState =
+	| { state: 'uploading'; uploadPercent: number }
+	| { state: 'verifying' }
+	| { state: 'restarting' }
+	| { state: 'failed'; reason: string };
+
 interface PaciState {
 	connectionState: 'disconnected' | 'connecting' | 'connected' | 'reconnecting';
 	deviceInfo: {
@@ -8,33 +14,25 @@ interface PaciState {
 		firmware: {
 			version: string;
 			commit: string;
+			hash: string;
 			buildDate: string;
 		};
 	} | null;
+	ota: null | OtaState;
 	sensors: {
 		bite: number;
 		touch: number[];
 	};
-	// firmwareInfo: McuImageInfo | null;
-	// firmwareFile: File | null;
-	// version: string;
-	// commit: string;
-	// buildDate: string;
-	// name: string;
-	// Other states like progress, status, etc.
 }
 
 const initialState: PaciState = {
 	connectionState: 'disconnected',
 	deviceInfo: null,
+	ota: null,
 	sensors: {
 		bite: 0,
 		touch: [],
-	}
-	// firmwareFile: null,
-	// version: '',
-	// commit: '',
-	// buildDate: '',
+	},
 };
 
 const state = writable<PaciState>(initialState);
@@ -50,6 +48,7 @@ paci.addEventListener('connected', async () => {
 	const name = await paci.getName();
 	const version = await paci.getFirmwareVersion();
 	const commit = await paci.getFirmwareCommit();
+	const hash = await paci.getFirmwareHash();
 	const firmwareDate = await paci.getFirmwareDate();
 
 	const buildDate =
@@ -60,14 +59,17 @@ paci.addEventListener('connected', async () => {
 	update((state) => ({
 		...state,
 		connectionState: 'connected',
+		ota: null,
 		deviceInfo: {
 			name,
 			firmware: {
 				version,
 				commit,
-				buildDate
-			}
-		}
+				hash,
+				buildDate,
+				uploadedProgress: null,
+			},
+		},
 	}));
 });
 
@@ -83,10 +85,27 @@ paci.addEventListener('touch', async (event) => {
 	const values = event.detail.values;
 	update((state) => ({
 		...state,
-			sensors: {
-				...state.sensors,
-				touch: values
-			}
+		sensors: {
+			...state.sensors,
+			touch: values,
+		},
+	}));
+});
+
+// Firmware Management
+paci.addEventListener('firmwareUploadProgress', (event) => {
+	const progress = event.detail.progressPercent ?? 0;
+	update((state) => ({
+		...state,
+		ota: { state: 'uploading', uploadPercent: progress },
+	}));
+});
+
+paci.addEventListener('firmwareUploadComplete', async (event) => {
+	await paci.applyFirmwareUpdate();
+	update((state) => ({
+		...state,
+		ota: { state: 'restarting' },
 	}));
 });
 
@@ -95,7 +114,7 @@ paci.addEventListener('bite', (event) => {
 	const normalized = event.detail.value / 255;
 	update((state) => ({
 		...state,
-		sensors: { ...state.sensors, bite: normalized * 100 }
+		sensors: { ...state.sensors, bite: normalized * 100 },
 	}));
 
 	biteHooks.forEach((hook) => hook(normalized));
@@ -117,6 +136,9 @@ const actions = {
 	disconnect: () => {
 		paci.disconnect();
 	},
+	uploadFirmware: async (firmwareFile: File) => {
+		await paci.uploadFirmwareFile(firmwareFile);
+	},
 	hook: {
 		/** Triggered each time the Paci sends updated bite values */
 		onBite: {
@@ -136,13 +158,13 @@ const actions = {
 				if (index !== -1) {
 					biteHooks.splice(index, 1);
 				}
-			}
-		}
-	}
+			},
+		},
+	},
 };
 
 const paciStore = {
 	subscribe,
-	...actions
+	...actions,
 };
 export default paciStore;

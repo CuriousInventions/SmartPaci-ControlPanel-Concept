@@ -43,15 +43,16 @@ export enum GroupImageId {
 }
 
 type Logger = {
+    debug: (...data: any[]) => void;
     info: (...data: any[]) => void;
     error: (...data: any[]) => void;
-}
+};
 
 export interface McuMgrMessage {
     readonly op: number;
     readonly group: number;
     readonly id: number;
-    readonly data: {images: McuImageStat[]}|any;
+    readonly data: { images: McuImageStat[] } | any;
     readonly length: number;
 }
 
@@ -60,7 +61,7 @@ export type SemVersion = {
     minor: number;
     revision: number;
     build: number;
-}
+};
 
 export interface McuImageStat {
     /** Is the current image actively running. */
@@ -82,16 +83,16 @@ export type McuImageInfo = {
     version: SemVersion;
     hash: Uint8Array;
     hashValid: boolean;
-    tags: {[tag: number]: Uint8Array};
-}
+    tags: { [tag: number]: Uint8Array };
+};
 
 interface McuMgrEventMap {
-    'connected': Event;
-    'connecting': Event;
-    'disconnected': Event;
-    'message': CustomEvent<McuMgrMessage>;
-    'imageUploadProgress': CustomEvent<{percentage: number}>;
-    'imageUploadFinished': Event;
+    connected: Event;
+    connecting: Event;
+    disconnected: Event;
+    message: CustomEvent<McuMgrMessage>;
+    imageUploadProgress: CustomEvent<{ percentage: number }>;
+    imageUploadFinished: CustomEvent<{ hash: Uint8Array }>;
 }
 
 // Helper interface to superimpose our custom events (and Event types) to the EventTarget
@@ -100,17 +101,17 @@ interface McuMgrEventTarget extends EventTarget {
     addEventListener<K extends keyof McuMgrEventMap>(
         type: K,
         listener: (ev: McuMgrEventMap[K]) => void,
-        options?: boolean | AddEventListenerOptions
+        options?: boolean | AddEventListenerOptions,
     ): void;
     addEventListener(
         type: string,
         callback: EventListenerOrEventListenerObject | null,
-        options?: EventListenerOptions | boolean
+        options?: EventListenerOptions | boolean,
     ): void;
 }
 
 // Again, see: https://dev.to/43081j/strongly-typed-event-emitters-using-eventtarget-in-typescript-3658
-const typedEventTarget = EventTarget as {new(): McuMgrEventTarget; prototype: McuMgrEventTarget};
+const typedEventTarget = EventTarget as { new (): McuMgrEventTarget; prototype: McuMgrEventTarget };
 
 export class McuManager extends typedEventTarget {
     static readonly SERVICE_UUID = '8d53dc1d-1db7-4cd3-868b-8a527460aa84';
@@ -124,15 +125,16 @@ export class McuManager extends typedEventTarget {
 
     private _uploadIsInProgress: boolean;
     private _buffer: Uint8Array;
-    private _logger: Logger ;
+    private _logger: Logger;
     private _uploadOffset: number;
     private _seq;
     private _userRequestedDisconnect;
     private _uploadImage: ArrayBuffer | null;
+    private _uploadImageInfo: McuImageInfo | null;
     private _uploadSlot: number;
 
-    constructor(options?: {mtu?: number}) {
-        super()
+    constructor(options?: { mtu?: number }) {
+        super();
 
         this._mtu = options?.mtu ?? 140;
         this._device = null;
@@ -141,26 +143,27 @@ export class McuManager extends typedEventTarget {
 
         this._uploadIsInProgress = false;
         this._buffer = new Uint8Array();
-        this._logger = { info: console.log, error: console.error };
+        this._logger = { debug: console.debug, info: console.log, error: console.error };
         this._seq = 0;
         this._userRequestedDisconnect = false;
         this._uploadOffset = 0;
         this._uploadImage = null;
+        this._uploadImageInfo = null;
         this._uploadSlot = 0;
     }
 
     private async _requestDevice(filters?: BluetoothLEScanFilter[]) {
-        let params : RequestDeviceOptions = filters == undefined
-            ? {
-                acceptAllDevices: true,
-                optionalServices: [McuManager.SERVICE_UUID],
-            }
-            : {
-                optionalServices: [McuManager.SERVICE_UUID],
-                filters: filters,
-                acceptAllDevices: false,
-
-            };
+        let params: RequestDeviceOptions =
+            filters == undefined
+                ? {
+                        acceptAllDevices: true,
+                        optionalServices: [McuManager.SERVICE_UUID],
+                    }
+                : {
+                        optionalServices: [McuManager.SERVICE_UUID],
+                        filters: filters,
+                        acceptAllDevices: false,
+                    };
 
         return navigator.bluetooth.requestDevice(params);
     }
@@ -169,7 +172,7 @@ export class McuManager extends typedEventTarget {
         try {
             this._device = await this._requestDevice(filters);
             this._logger.info(`Connecting to device ${this.name}...`);
-            this._device.addEventListener('gattserverdisconnected', async event => {
+            this._device.addEventListener('gattserverdisconnected', async (event) => {
                 this._logger.info(event);
                 if (!this._userRequestedDisconnect) {
                     this._logger.info('Trying to reconnect');
@@ -191,11 +194,10 @@ export class McuManager extends typedEventTarget {
         this._connect(0);
     }
 
-    private _connect (timeout: number = 1000) {
+    private _connect(timeout: number = 1000) {
         setTimeout(async () => {
             try {
-                if (!this._device?.gatt)
-                    throw new Error("No GATT Service or Device selected");
+                if (!this._device?.gatt) throw new Error('No GATT Service or Device selected');
 
                 const server = this._device.gatt;
                 if (!this._device.gatt.connected) {
@@ -207,8 +209,13 @@ export class McuManager extends typedEventTarget {
                 this._service = await server.getPrimaryService(McuManager.SERVICE_UUID);
                 this._logger.info(`Service connected.`);
 
-                this._characteristic = await this._service.getCharacteristic(McuManager.CHARACTERISTIC_UUID);
-                this._characteristic.addEventListener('characteristicvaluechanged', this._notification.bind(this));
+                this._characteristic = await this._service.getCharacteristic(
+                    McuManager.CHARACTERISTIC_UUID,
+                );
+                this._characteristic.addEventListener(
+                    'characteristicvaluechanged',
+                    this._notification.bind(this),
+                );
                 await this._characteristic.startNotifications();
                 await this._connected();
                 if (this._uploadIsInProgress) {
@@ -226,12 +233,12 @@ export class McuManager extends typedEventTarget {
     }
 
     private _connected() {
-        this.dispatchEvent(new Event('connteded'));
+        this.dispatchEvent(new Event('connected'));
     }
 
     private _disconnected() {
         this._logger.info('Disconnected.');
-        this.dispatchEvent(new Event('disconntected'));
+        this.dispatchEvent(new Event('disconnected'));
 
         this._device = null;
         this._service = null;
@@ -240,7 +247,7 @@ export class McuManager extends typedEventTarget {
         this._userRequestedDisconnect = false;
     }
 
-    get name() : string | null {
+    get name(): string | null {
         return this._device?.name ?? null;
     }
 
@@ -255,7 +262,17 @@ export class McuManager extends typedEventTarget {
         const length_hi = encodedData.length >> 8;
         const group_lo = group & 255;
         const group_hi = group >> 8;
-        const message = [op, _flags, length_hi, length_lo, group_hi, group_lo, this._seq, id, ...encodedData];
+        const message = [
+            op,
+            _flags,
+            length_hi,
+            length_lo,
+            group_hi,
+            group_lo,
+            this._seq,
+            id,
+            ...encodedData,
+        ];
 
         // this._logger.info('>'  + message.map(x => x.toString(16).padStart(2, '0')).join(' '));
         await this._characteristic!.writeValueWithoutResponse(Uint8Array.from(message));
@@ -270,7 +287,7 @@ export class McuManager extends typedEventTarget {
 
         // this._logger.info('<'  + [...message].map(x => x.toString(16).padStart(2, '0')).join(' '));
         if (this._buffer.length < messageLength + McuManager.SMP_HEADER_SIZE) {
-            this._logger.error("Ignoring message?!");
+            this._logger.error('Ignoring message?!');
             return;
         }
 
@@ -285,15 +302,15 @@ export class McuManager extends typedEventTarget {
         const group = group_hi * 256 + group_lo;
         // Note that "rc" may not be present if it is 0
         if (data.rc) {
-            this._logger.error("Got a non-zero response code")
-            this._logger.error(`Message: op: ${op}, group: ${group}, id: ${id}, length: ${length}`, data);
+            this._logger.debug('Got a non-zero response code');
+            this._logger.debug(`Message: op: ${op}, group: ${group}, id: ${id}, length: ${length}`, data);
         } else if (group === GroupId.Image && id === GroupImageId.Upload && data.off) {
             this._uploadOffset = data.off;
             this._uploadNext();
             return;
         }
 
-        this.dispatchEvent(new CustomEvent('message', {detail: { op, group, id, data, length }}));
+        this.dispatchEvent(new CustomEvent('message', { detail: { op, group, id, data, length } }));
     }
 
     cmdReset(): Promise<void> {
@@ -313,11 +330,17 @@ export class McuManager extends typedEventTarget {
     }
 
     cmdImageTest(hash: Uint8Array): Promise<void> {
-        return this._sendMessage(OpCode.Write, GroupId.Image, GroupImageId.State, { hash, confirm: false });
+        return this._sendMessage(OpCode.Write, GroupId.Image, GroupImageId.State, {
+            hash,
+            confirm: false,
+        });
     }
 
     cmdImageConfirm(hash: Uint8Array): Promise<void> {
-        return this._sendMessage(OpCode.Write, GroupId.Image, GroupImageId.State, { hash, confirm: true });
+        return this._sendMessage(OpCode.Write, GroupId.Image, GroupImageId.State, {
+            hash,
+            confirm: true,
+        });
     }
 
     private _hash(image: Uint8Array | ArrayBuffer): Promise<ArrayBuffer> {
@@ -326,14 +349,20 @@ export class McuManager extends typedEventTarget {
 
     private async _uploadNext() {
         if (!this._uploadImage) {
-            this._logger.info("No firmware uplaod to do...");
+            this._logger.info('No firmware upload to do...');
             return;
         }
 
         if (this._uploadOffset >= this._uploadImage.byteLength) {
             this._uploadIsInProgress = false;
-            this.dispatchEvent(new Event('imageUploadFinished'));
-            this._logger.info("Upload finished.");
+            this.dispatchEvent(
+                new CustomEvent('imageUploadFinished', {
+                    detail: {
+                        hash: this._uploadImageInfo?.hash,
+                    },
+                }),
+            );
+            this._logger.info('Upload finished.');
             return;
         }
 
@@ -343,22 +372,26 @@ export class McuManager extends typedEventTarget {
             off: number;
             len?: number;
             sha?: Uint8Array;
-        }
+        };
         const message: MCUPayload = { data: new Uint8Array(), off: this._uploadOffset };
         if (this._uploadOffset === 0) {
             message.len = this._uploadImage.byteLength;
             message.sha = new Uint8Array(await this._hash(this._uploadImage));
         }
 
-        this.dispatchEvent(new CustomEvent('imageUploadProgress', {
-            detail: {
-                percentage: Math.floor(this._uploadOffset / this._uploadImage.byteLength * 100),
-            },
-        }));
+        this.dispatchEvent(
+            new CustomEvent('imageUploadProgress', {
+                detail: {
+                    percentage: Math.floor((this._uploadOffset / this._uploadImage.byteLength) * 100),
+                },
+            }),
+        );
 
         const length = this._mtu - cborg.encode(message).byteLength - nmpOverhead;
 
-        message.data = new Uint8Array(this._uploadImage.slice(this._uploadOffset, this._uploadOffset + length));
+        message.data = new Uint8Array(
+            this._uploadImage.slice(this._uploadOffset, this._uploadOffset + length),
+        );
 
         this._uploadOffset += length;
 
@@ -374,12 +407,13 @@ export class McuManager extends typedEventTarget {
 
         this._uploadOffset = 0;
         this._uploadImage = image;
+        this._uploadImageInfo = await this.imageInfo(image);
         this._uploadSlot = slot;
 
         await this._uploadNext();
     }
 
-    private * _extractTlvs(data: ArrayBuffer): Generator<{tag: number, value: Uint8Array}> {
+    private *_extractTlvs(data: ArrayBuffer): Generator<{ tag: number; value: Uint8Array }> {
         const view = new DataView(data);
         let offset = 0;
         while (offset < view.byteLength) {
@@ -389,7 +423,7 @@ export class McuManager extends typedEventTarget {
             const data = view.buffer.slice(offset, offset + len);
             offset += len;
 
-            yield {tag, value: new Uint8Array(data)};
+            yield { tag, value: new Uint8Array(data) };
         }
     }
 
@@ -411,8 +445,7 @@ export class McuManager extends typedEventTarget {
             throw new Error('Invalid image (wrong magic bytes)');
 
         // check load address is 0x00000000
-        if (view.getUint32(4, littleEndian) != 0)
-            throw new Error('Invalid image (wrong load address)');
+        if (view.getUint32(4, littleEndian) != 0) throw new Error('Invalid image (wrong load address)');
 
         const headerSize = view.getUint16(8, true);
 
@@ -426,8 +459,7 @@ export class McuManager extends typedEventTarget {
             throw new Error('Invalid image (wrong image size)');
 
         // check flags is 0x00000000
-        if (view.getUint32(16, littleEndian) !== 0)
-            throw new Error('Invalid image (wrong flags)');
+        if (view.getUint32(16, littleEndian) !== 0) throw new Error('Invalid image (wrong flags)');
 
         const version: SemVersion = {
             major: view.getUint8(20),
@@ -436,14 +468,18 @@ export class McuManager extends typedEventTarget {
             build: view.getUint32(24, littleEndian),
         };
 
-        const hash = new Uint8Array(await this._hash(image.slice(0, headerSize + imageSize + protected_tlv_lenth)));
-        const info = {version, hash, hashValid:false, imageSize, tags: []} as McuImageInfo;
+        const hash = new Uint8Array(
+            await this._hash(image.slice(0, headerSize + imageSize + protected_tlv_lenth)),
+        );
+        const info = { version, hash, hashValid: false, imageSize, tags: [] } as McuImageInfo;
 
         let offset = headerSize + imageSize;
         let tlv_end = offset;
         if (protected_tlv_lenth > 0) {
             if (view.getUint16(offset, littleEndian) !== 0x6908)
-                throw new Error(`Expected protected TLV magic number. (0x${offset.toString(16)}: 0x${view.getUint16(offset, littleEndian).toString(16)})`);
+                throw new Error(
+                    `Expected protected TLV magic number. (0x${offset.toString(16)}: 0x${view.getUint16(offset, littleEndian).toString(16)})`,
+                );
 
             tlv_end = view.getUint16(offset + 2, littleEndian) + offset;
             for (let tlv of this._extractTlvs(view.buffer.slice(offset + 4, tlv_end))) {
@@ -453,7 +489,9 @@ export class McuManager extends typedEventTarget {
         }
 
         if (view.getUint16(offset, littleEndian) !== 0x6907)
-            throw new Error(`Expected TLV magic number. (0x${offset.toString(16)}: 0x${view.getUint16(offset, littleEndian).toString(16)})`);
+            throw new Error(
+                `Expected TLV magic number. (0x${offset.toString(16)}: 0x${view.getUint16(offset, littleEndian).toString(16)})`,
+            );
 
         tlv_end = view.getUint16(offset + 2, littleEndian) + offset;
         for (let tlv of this._extractTlvs(view.buffer.slice(offset + 4, tlv_end))) {
@@ -467,4 +505,3 @@ export class McuManager extends typedEventTarget {
         return info;
     }
 }
-
