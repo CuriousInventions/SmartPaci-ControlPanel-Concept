@@ -15,9 +15,9 @@
 			intent: {
 				info: 'bg-gray-100 border-gray-400/80',
 				error: 'bg-red-200 border-red-400',
-				success: 'bg-green-100 border-green-400'
-			}
-		}
+				success: 'bg-green-100 border-green-400',
+			},
+		},
 	});
 
 	const loaderBg = cva('loaderBg', {
@@ -25,18 +25,18 @@
 			intent: {
 				info: 'bg-gray-100',
 				error: 'bg-red-100',
-				success: 'bg-green-50'
-			}
-		}
+				success: 'bg-green-50',
+			},
+		},
 	});
 	const loader = cva('loader', {
 		variants: {
 			intent: {
 				info: 'bg-gray-300/70',
 				error: 'bg-red-300',
-				success: 'bg-green-300'
-			}
-		}
+				success: 'bg-green-300',
+			},
+		},
 	});
 </script>
 
@@ -47,10 +47,10 @@
 				in:fly={{ y: 20, duration: toastStore.CONFIG.FLY_IN_DURATION }}
 				out:fly={{
 					y: 20,
-					duration: toastStore.CONFIG.FLY_OUT_DURATION
+					duration: toastStore.CONFIG.FLY_OUT_DURATION,
 				}}
 				class="rounded relative shadow-lg border-2 p-3 mb-2 pointer-events-auto {card({
-					intent: toast.intent
+					intent: toast.intent,
 				})}"
 			>
 				{#if toast.title}
@@ -61,12 +61,12 @@
 				{/if}
 				<div
 					class="absolute left-0 bottom-0 right-0 h-1 {loaderBg({
-						intent: toast.intent
+						intent: toast.intent,
 					})}"
 				>
 					<div
 						class="h-full duration-100 {loader({
-							intent: toast.intent
+							intent: toast.intent,
 						})}"
 						style="width: {(toast.durationRemaining / toast.duration) * 100}%"
 					></div>

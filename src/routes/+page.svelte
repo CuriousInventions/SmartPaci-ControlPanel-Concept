@@ -20,14 +20,14 @@
 			toastStore.post({
 				intent: 'success',
 				title: 'Successfully connected',
-				duration: 5000
+				duration: 5000,
 			});
 		} catch (error) {
 			console.log(error);
 			if (error instanceof DOMException) {
 				const toast: ToastConfig = {
 					intent: 'error',
-					title: 'Failed to initialize Bluetooth'
+					title: 'Failed to initialize Bluetooth',
 				};
 
 				switch (error.name) {
@@ -50,7 +50,7 @@
 				toastStore.post({
 					intent: 'error',
 					title: 'Failed to initialize Bluetooth',
-					message: 'An unknown error occurred.'
+					message: 'An unknown error occurred.',
 				});
 			}
 		}

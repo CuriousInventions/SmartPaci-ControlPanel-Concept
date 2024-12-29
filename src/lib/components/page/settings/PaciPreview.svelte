@@ -15,7 +15,7 @@
 			paciSvg.getElementById('touchpad-bottom-left') as SVGElement | null,
 			paciSvg.getElementById('touchpad-top-left') as SVGElement | null,
 			paciSvg.getElementById('touchpad-top-right') as SVGElement | null,
-			paciSvg.getElementById('touchpad-bottom-right') as SVGElement | null
+			paciSvg.getElementById('touchpad-bottom-right') as SVGElement | null,
 		];
 	}
 

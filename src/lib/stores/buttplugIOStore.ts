@@ -2,7 +2,7 @@ import {
 	ButtplugBrowserWebsocketClientConnector,
 	ButtplugClient,
 	ButtplugClientDevice,
-	ButtplugDeviceError
+	ButtplugDeviceError,
 } from 'buttplug';
 import { writable } from 'svelte/store';
 import paciStore from './paciStore';
@@ -14,7 +14,7 @@ interface ButtplugState {
 
 const initialState: ButtplugState = {
 	connected: false,
-	devices: []
+	devices: [],
 };
 
 const state = writable<ButtplugState>(initialState);
@@ -84,11 +84,11 @@ const actions = {
 	disconnectClient: async () => {
 		await buttplugClient.disconnect();
 		// update((state) => ({ ...state, connected: false }));
-	}
+	},
 };
 
 const buttplugIOStore = {
 	subscribe,
-	...actions
+	...actions,
 };
 export default buttplugIOStore;

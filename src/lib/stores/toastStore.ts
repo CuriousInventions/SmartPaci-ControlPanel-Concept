@@ -19,7 +19,7 @@ interface ToastState {
 }
 
 const initialState: ToastState = {
-	toasts: []
+	toasts: [],
 };
 
 // Constants
@@ -27,7 +27,7 @@ const CONFIG = {
 	FLY_IN_DURATION: 300,
 	FLY_OUT_DURATION: 300,
 	DEFAULT_SHOWN_DURATION: 10000,
-	TICK_INTERVAL: 50
+	TICK_INTERVAL: 50,
 };
 
 const state = writable<ToastState>(initialState);
@@ -44,7 +44,7 @@ function startToastDecay(toast: Toast) {
 				// Create a copy of the toast and update durationRemaining
 				const updatedToast = {
 					...state.toasts[toastIndex],
-					durationRemaining: state.toasts[toastIndex].durationRemaining - CONFIG.TICK_INTERVAL
+					durationRemaining: state.toasts[toastIndex].durationRemaining - CONFIG.TICK_INTERVAL,
 				};
 
 				// Replace the old toast with the updated one
@@ -79,7 +79,7 @@ const actions = {
 			...toastConfig,
 			id: nextId++,
 			duration: toastConfig.duration,
-			durationRemaining: toastConfig.duration
+			durationRemaining: toastConfig.duration,
 		};
 
 		update((state) => {
@@ -100,12 +100,12 @@ const actions = {
 			state.toasts = state.toasts.filter((toast) => toast.id !== toastToRemove.id);
 			return state;
 		});
-	}
+	},
 };
 
 const toastStore = {
 	subscribe,
 	CONFIG,
-	...actions
+	...actions,
 };
 export default toastStore;
