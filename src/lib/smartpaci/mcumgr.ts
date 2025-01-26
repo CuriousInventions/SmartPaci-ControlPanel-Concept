@@ -91,7 +91,7 @@ interface McuMgrEventMap {
 	connecting: Event;
 	disconnected: Event;
 	message: CustomEvent<McuMgrMessage>;
-	imageUploadProgress: CustomEvent<{ percentage: number }>;
+	imageUploadProgress: CustomEvent<{ percentage: number, uploadedBytes: number, totalBytes: number }>;
 	imageUploadFinished: CustomEvent<{ hash: Uint8Array }>;
 }
 
@@ -143,7 +143,11 @@ export class McuManager extends typedEventTarget {
 
 		this._uploadIsInProgress = false;
 		this._buffer = new Uint8Array();
-		this._logger = { debug: console.debug, info: console.log, error: console.error };
+		this._logger = {
+			debug: (...args: any[]) => console.debug('McuMgr:', ...args),
+			info: (...args: any[]) => console.log('McuMgr:', ...args),
+			error: (...args: any[]) => console.error('McuMgr:', ...args),
+		};
 		this._seq = 0;
 		this._userRequestedDisconnect = false;
 		this._uploadOffset = 0;
@@ -203,11 +207,11 @@ export class McuManager extends typedEventTarget {
 				if (!this._device.gatt.connected) {
 					this.dispatchEvent(new Event('connecting'));
 					await server.connect();
-					this._logger.info(`Server connected.`);
+					this._logger.debug(`Connected to GATT server.`);
 				}
 
 				this._service = await server.getPrimaryService(McuManager.SERVICE_UUID);
-				this._logger.info(`Service connected.`);
+				this._logger.debug(`Service connected.`);
 
 				this._characteristic = await this._service.getCharacteristic(
 					McuManager.CHARACTERISTIC_UUID,
@@ -222,12 +226,19 @@ export class McuManager extends typedEventTarget {
 					this._uploadNext();
 				}
 			} catch (error) {
-				this._logger.error(error);
-				await this._disconnected();
+				if (error instanceof Error && error.name == 'NotSupportedError'){
+					this._logger.debug(error);
+					// Try again.
+					this._connect();
+				}else {
+					this._logger.error(error);
+					await this._disconnected();
+				}
 			}
 		}, timeout);
 	}
 	disconnect() {
+		this._logger.debug('Disconnecting');
 		this._userRequestedDisconnect = true;
 		return this._device?.gatt?.disconnect();
 	}
@@ -237,7 +248,7 @@ export class McuManager extends typedEventTarget {
 	}
 
 	private _disconnected() {
-		this._logger.info('Disconnected.');
+		this._logger.debug('Disconnected.');
 		this.dispatchEvent(new Event('disconnected'));
 
 		this._device = null;
@@ -383,6 +394,8 @@ export class McuManager extends typedEventTarget {
 			new CustomEvent('imageUploadProgress', {
 				detail: {
 					percentage: Math.floor((this._uploadOffset / this._uploadImage.byteLength) * 100),
+					uploadedBytes: this._uploadOffset,
+					totalBytes: this._uploadImage.byteLength,
 				},
 			}),
 		);

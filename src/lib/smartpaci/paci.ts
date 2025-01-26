@@ -159,7 +159,7 @@ export class Paci extends typedEventTarget {
 	private _firmwareVersion: Promise<PaciVersion> | null;
 	private _name: string | null = null;
 	private _features: number = 0;
-	private _reconnect = false;
+	private _shouldReconnect = false;
 	private _firmwareFileInfo: FirmwareInfo | null = null;
 
 	private _mcuManager = new McuManager({ mtu: 372 });
@@ -191,8 +191,16 @@ export class Paci extends typedEventTarget {
 	}
 
 	private async onMcuManagerConnected(_: Event): Promise<void> {
-		await this._mcuManager.cmdImageState();
+		do {
+			try{
+				await this._mcuManager.cmdImageState();
+				return;
+			} catch {
+				await new Promise<void>(r => setTimeout(() => r(), 1000));
+			}
+		} while(this._device?.gatt?.connected);
 	}
+
 	private async onMcuManagerMessage(event: CustomEvent<McuMgrMessage>): Promise<void> {
 		switch (event.detail.group) {
 			case GroupId.Image:
@@ -229,11 +237,13 @@ export class Paci extends typedEventTarget {
 	}
 
 	async disconnect(): Promise<void> {
-		this._reconnect = false;
+		console.debug('Disconnecting');
+		this._shouldReconnect = false;
 		this._features = 0;
 		this._mcuManager.disconnect();
 		await this._device?.gatt?.disconnect();
 		this._disconnectSignal.abort();
+		this.dispatchEvent(new Event('disconnected'));
 	}
 
 	get mcuManager(): McuManager {
@@ -257,9 +267,17 @@ export class Paci extends typedEventTarget {
 		await this._connect();
 	}
 
+	private async _reconnect(): Promise<void> {
+		console.info('Reconnecting');
+		this._disconnectSignal.abort();
+		this.dispatchEvent(new Event('reconnecting'));
+		await this._connect();
+
+	}
+
 	private async _connect(): Promise<void> {
 		if (this._device == null) throw new Error('No device selected.');
-
+		console.info('Connecting');
 		this._firmwareVersion = null;
 
 		// Assign a new abort controller for each new device connection.
@@ -267,177 +285,211 @@ export class Paci extends typedEventTarget {
 		this._disconnectSignal?.abort();
 		this._disconnectSignal = new AbortController();
 
-		this._name = this._device?.name ?? null;
-		this.dispatchEvent(new CustomEvent('nameChanged', { detail: { name: this._name } }));
+		try {
+			const name = this._device?.name ?? null;
+			if (this._name != name) {
+				this._name = name;
+				this.dispatchEvent(new CustomEvent('nameChanged', { detail: { name: this._name } }));
+			}
 
-		this._device.addEventListener(
-			'gattserverdisconnected',
-			async (_) => {
-				if (this._reconnect) {
-					// TODO: Implement a back-off-timer when reconnecting.
-					this.dispatchEvent(new Event('reconnecting'));
+			this._device.addEventListener(
+				'gattserverdisconnected',
+				async (event) => {
+					console.info('Disconnected', event);
 					this._disconnectSignal.abort();
-					await this._connect();
-				} else {
-					this.dispatchEvent(new Event('disconnected'));
-				}
-			},
-			{ signal: this._disconnectSignal.signal } as any,
-		);
-
-		const server = await this._device.gatt?.connect();
-		if (server === undefined) return;
-
-		this._reconnect = true;
-
-		this._service = await server.getPrimaryService(this.SERVICE_UUID);
-
-		// Check to see if the McuMgr service is present.
-		try {
-			await server!.getPrimaryService(McuManager.SERVICE_UUID);
-			this._mcuManager.attach(this._device!);
-			this._features |= PaciFeature.McuMgr;
-		} catch {}
-
-		// Check to see if the battery service is present.
-		try {
-			this._batteryService = await server!.getPrimaryService(this.SERVICE_BATTERY);
-			this._batteryCharacteristic = await this._batteryService.getCharacteristic(
-				this.CHARACTERISTIC_BATTERY_LEVEL,
-			);
-			this._batteryCharacteristic.addEventListener(
-				'characteristicvaluechanged',
-				(event) => {
-					const battery = event.target as BluetoothRemoteGATTCharacteristic;
-					this.dispatchEvent(
-						new CustomEvent('battery', { detail: { value: battery.value!.getUint8(0) } }),
-					);
-				},
-				{ signal: this._disconnectSignal.signal } as any,
-			);
-
-			await this._batteryCharacteristic.startNotifications();
-			await this._batteryCharacteristic?.readValue();
-		} catch {
-			// Assume no battery is present.
-			this.dispatchEvent(new CustomEvent('battery', { detail: { value: 0 } }));
-		}
-
-		// Setup our sensor listeners on the various characteristics.
-		try {
-			this._biteCharacteristic = await this._service.getCharacteristic(
-				this.CHARACTERISTIC_BITE_UUID,
-			);
-			this._biteCharacteristic.addEventListener(
-				'characteristicvaluechanged',
-				(event) => {
-					const char = event.target as BluetoothRemoteGATTCharacteristic;
-					const value = char.value?.getUint8(0) ?? 0;
-					this.dispatchEvent(new CustomEvent('bite', { detail: { value } }));
-				},
-				{ signal: this._disconnectSignal.signal } as any,
-			);
-			await this._biteCharacteristic.startNotifications();
-			this._features |= PaciFeature.Bite;
-		} catch {
-			console.warn('No bite sensor available.');
-		}
-
-		try {
-			this._suckCharacteristic = await this._service.getCharacteristic(
-				this.CHARACTERISTIC_FORCE_UUID,
-			);
-			this._suckCharacteristic.addEventListener(
-				'characteristicvaluechanged',
-				(event) => {
-					const char = event.target as BluetoothRemoteGATTCharacteristic;
-					const forces: number[] = [];
-					for (let i = 0; i < char.value!.byteLength; i++) {
-						forces[i] = char.value?.getUint8(i) ?? 0;
+					if (this._shouldReconnect) {
+						await this._reconnect();
+					} else {
+						this.dispatchEvent(new Event('disconnected'));
 					}
-
-					this.dispatchEvent(new CustomEvent('suck', { detail: { values: forces } }));
 				},
-				{ signal: this._disconnectSignal.signal } as any,
+				{signal: this._disconnectSignal.signal } as any,
 			);
-			await this._suckCharacteristic.startNotifications();
-			this._features |= PaciFeature.Suck;
-		} catch {
-			console.warn('No suck sensor available');
-		}
 
-		try {
-			this._touchCharacteristic = await this._service.getCharacteristic(
-				this.CHARACTERISTIC_TOUCH_UUID,
-			);
-			this._touchCharacteristic.addEventListener(
-				'characteristicvaluechanged',
-				(event) => {
-					const char = event.target as BluetoothRemoteGATTCharacteristic;
-					const touch_bitmap: number = char.value?.getUint8(0) ?? 0;
-					const touches: number[] = [];
-					for (let i = 0; i < 8; i++) {
-						if ((touch_bitmap & (1 << i)) != 0) {
-							touches.push(i);
-						}
-					}
-
-					this.dispatchEvent(new CustomEvent('touch', { detail: { values: touches } }));
-				},
-				{ signal: this._disconnectSignal.signal } as any,
-			);
-			await this._touchCharacteristic.startNotifications();
-			this._features |= PaciFeature.Touch;
-		} catch {
-			console.warn('No touch sensor available.');
-		}
-
-		this._controlCharacteristic = await this._service.getCharacteristic(
-			this.CHARACTERISTIC_CONTROL_UUID,
-		);
-		this._controlCharacteristic.addEventListener('characteristicvaluechanged', (event) => {
-			const char = event.target as BluetoothRemoteGATTCharacteristic;
-			if (char.value === undefined) {
+			const server = await this._device.gatt?.connect();
+			if (server === undefined) {
+				console.error('Failed to connect');
 				return;
 			}
+			console.info('Connected');
+			this._shouldReconnect = true;
 
-			const response = ControlResponse.fromBinary(new Uint8Array(char.value.buffer));
-			switch (response.response.case) {
-				case 'firmwareVersion':
-					const version = response.response.value as Version;
-					this.dispatchEvent(
-						new CustomEvent('firmwareVersion', {
-							detail: {
-								version: new PaciVersion(
-									{
-										major: version.major,
-										minor: version.minor,
-										revision: version.revision,
-										build: version.build,
-									},
-									toHex(version.commit),
-									new Date(version.timestamp == BigInt(0) ? NaN : Number(version.timestamp) * 1000),
-									toHex(version.hash),
-								),
-							},
-						}),
-					);
+			this._service = await server.getPrimaryService(this.SERVICE_UUID);
 
-					break;
-				case 'sensorReadings':
-					break;
-				default:
-					console.log(`Unsupported response (${response.response.case})`, response);
-					return;
+			// Check to see if the McuMgr service is present.
+			try {
+				await server!.getPrimaryService(McuManager.SERVICE_UUID);
+				this._mcuManager.attach(this._device!);
+				this._features |= PaciFeature.McuMgr;
+			} catch (error) {
+				if (error instanceof Error && error.name == 'NetworkError')
+					throw error;
+				console.debug('Unhandled error while getting McuMgr service', error);
 			}
-		});
 
-		await this._controlCharacteristic.startNotifications();
+			// Check to see if the battery service is present.
+			try {
+				this._batteryService = await server!.getPrimaryService(this.SERVICE_BATTERY);
+				this._batteryCharacteristic = await this._batteryService.getCharacteristic(
+					this.CHARACTERISTIC_BATTERY_LEVEL,
+				);
+				this._batteryCharacteristic.addEventListener(
+					'characteristicvaluechanged',
+					(event) => {
+						const battery = event.target as BluetoothRemoteGATTCharacteristic;
+						this.dispatchEvent(
+							new CustomEvent('battery', { detail: { value: battery.value!.getUint8(0) } }),
+						);
+					},
+					{ signal: this._disconnectSignal.signal } as any,
+				);
 
-		this.dispatchEvent(
-			new CustomEvent('featuresUpdated', { detail: { features: this._features } }),
-		);
-		this.dispatchEvent(new Event('connected'));
+				await this._batteryCharacteristic.startNotifications();
+				await this._batteryCharacteristic?.readValue();
+			} catch (error) {
+				if (error instanceof Error && error.name == 'NotFoundError') {
+					// Assume no battery is present.
+					this.dispatchEvent(new CustomEvent('battery', { detail: { value: 0 } }));
+				} else {
+					throw error;
+				}
+			}
+
+			// Setup our sensor listeners on the various characteristics.
+			try {
+				this._biteCharacteristic = await this._service.getCharacteristic(
+					this.CHARACTERISTIC_BITE_UUID,
+				);
+				this._biteCharacteristic.addEventListener(
+					'characteristicvaluechanged',
+					(event) => {
+						const char = event.target as BluetoothRemoteGATTCharacteristic;
+						const value = char.value?.getUint8(0) ?? 0;
+						this.dispatchEvent(new CustomEvent('bite', { detail: { value } }));
+					},
+					{ signal: this._disconnectSignal.signal } as any,
+				);
+				await this._biteCharacteristic.startNotifications();
+				this._features |= PaciFeature.Bite;
+			} catch (error) {
+				if (error instanceof Error && error.name == 'NotFoundError'){
+					console.warn('No bite sensor available.');
+				} else {
+					throw error;
+				}
+			}
+
+			try {
+				this._suckCharacteristic = await this._service.getCharacteristic(
+					this.CHARACTERISTIC_FORCE_UUID,
+				);
+				this._suckCharacteristic.addEventListener(
+					'characteristicvaluechanged',
+					(event) => {
+						const char = event.target as BluetoothRemoteGATTCharacteristic;
+						const forces: number[] = [];
+						for (let i = 0; i < char.value!.byteLength; i++) {
+							forces[i] = char.value?.getUint8(i) ?? 0;
+						}
+
+						this.dispatchEvent(new CustomEvent('suck', { detail: { values: forces } }));
+					},
+					{ signal: this._disconnectSignal.signal } as any,
+				);
+				await this._suckCharacteristic.startNotifications();
+				this._features |= PaciFeature.Suck;
+			} catch (error) {
+				if (error instanceof Error && error.name == 'NotFoundError'){
+					console.warn('No suck sensor available');
+				} else {
+					throw error;
+				}
+			}
+
+			try {
+				this._touchCharacteristic = await this._service.getCharacteristic(
+					this.CHARACTERISTIC_TOUCH_UUID,
+				);
+				this._touchCharacteristic.addEventListener(
+					'characteristicvaluechanged',
+					(event) => {
+						const char = event.target as BluetoothRemoteGATTCharacteristic;
+						const touch_bitmap: number = char.value?.getUint8(0) ?? 0;
+						const touches: number[] = [];
+						for (let i = 0; i < 8; i++) {
+							if ((touch_bitmap & (1 << i)) != 0) {
+								touches.push(i);
+							}
+						}
+
+						this.dispatchEvent(new CustomEvent('touch', { detail: { values: touches } }));
+					},
+					{ signal: this._disconnectSignal.signal } as any,
+				);
+				await this._touchCharacteristic.startNotifications();
+				this._features |= PaciFeature.Touch;
+			} catch (error) {
+				if (error instanceof Error && error.name == 'NotFoundError'){
+					console.warn('No touch sensor available.');
+				} else {
+					throw error;
+				}
+			}
+
+			this._controlCharacteristic = await this._service.getCharacteristic(
+				this.CHARACTERISTIC_CONTROL_UUID,
+			);
+			this._controlCharacteristic.addEventListener('characteristicvaluechanged', (event) => {
+				const char = event.target as BluetoothRemoteGATTCharacteristic;
+				if (char.value === undefined) {
+					return;
+				}
+
+				const response = ControlResponse.fromBinary(new Uint8Array(char.value.buffer));
+				switch (response.response.case) {
+					case 'firmwareVersion':
+						const version = response.response.value as Version;
+						this.dispatchEvent(
+							new CustomEvent('firmwareVersion', {
+								detail: {
+									version: new PaciVersion(
+										{
+											major: version.major,
+											minor: version.minor,
+											revision: version.revision,
+											build: version.build,
+										},
+										toHex(version.commit),
+										new Date(version.timestamp == BigInt(0) ? NaN : Number(version.timestamp) * 1000),
+										toHex(version.hash),
+									),
+								},
+							}),
+						);
+
+						break;
+					case 'sensorReadings':
+						break;
+					default:
+						console.log(`Unsupported response (${response.response.case})`, response);
+						return;
+				}
+			});
+
+			await this._controlCharacteristic.startNotifications();
+
+			this.dispatchEvent(
+				new CustomEvent('featuresUpdated', { detail: { features: this._features } }),
+			);
+			this.dispatchEvent(new Event('connected'));
+		} catch (error) {
+			if (error instanceof Error && error.name == 'NetworkError'){
+				if (!this._device.gatt?.connected)
+					await this._reconnect();
+			} else {
+				throw error;
+			}
+		}
 	}
 
 	async setName(name: string): Promise<void> {
@@ -537,15 +589,22 @@ export class Paci extends typedEventTarget {
 	async uploadFirmwareFile(firmware: File): Promise<void> {
 		this._firmwareFileInfo = await Paci.getFirmwareInfo(firmware);
 		const statResponse = this._waitMcuMgrResponse(GroupId.Image, GroupImageId.State).then(
-			(message) => {
+			async (message) => {
 				const images = message.data.images as McuImageStat[];
+				// Is the firmware to upload, already running on the device?
 				if (toHex(images[0].hash) == this._firmwareFileInfo!.hash)
-					throw new Error('Cannot upload the same firmware that is already on the device.');
+					throw new Error('Cannot upload the same firmware that is already running on the device.');
+
+				// Has it already been uploaded or reverted from a failed upload attempt?
+				if (toHex(images[1].hash) == this._firmwareFileInfo!.hash)
+					this.dispatchEvent(new Event('firmwareUploadComplete'));
+				else
+					return this.mcuManager.cmdUpload(await firmware.arrayBuffer());
+
 			},
 		);
 		await this.mcuManager.cmdImageState();
 		await statResponse;
-		await this.mcuManager.cmdUpload(await firmware.arrayBuffer());
 	}
 
 	// Select the firmware that's in the uploaded slot and attempt to reboot into it.

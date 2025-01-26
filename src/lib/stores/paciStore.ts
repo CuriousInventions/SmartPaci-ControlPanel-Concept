@@ -103,11 +103,11 @@ paci.addEventListener('firmwareUploadProgress', (event) => {
 
 paci.addEventListener('firmwareUploadComplete', async (event) => {
 	try {
-		await paci.applyFirmwareUpdate();
 		update((state) => ({
 			...state,
 			ota: { state: 'restarting' },
 		}));
+		await paci.applyFirmwareUpdate();
 	} catch (error) {
 		const reason = error instanceof Error ? error.message : 'An unknown problem has happened';
 		update((state) => ({
@@ -141,8 +141,8 @@ const actions = {
 			throw err;
 		}
 	},
-	disconnect: () => {
-		paci.disconnect();
+	disconnect: async () => {
+		await paci.disconnect();
 	},
 	uploadFirmware: async (firmwareFile: File) => {
 		try {

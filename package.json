@@ -48,6 +48,8 @@
 	},
 	"type": "module",
 	"dependencies": {
+		"@types/common-errors": "^1.0.5",
+		"@types/web-bluetooth": "^0.0.20",
 		"buttplug": "^3.2.1"
 	}
 }
