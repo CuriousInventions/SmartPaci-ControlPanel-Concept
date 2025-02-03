@@ -7,7 +7,7 @@ import {
 	Setting,
 	Version,
 	VersionRequest,
-} from './generated/bluetooth_pb';
+} from '../generated/bluetooth_pb';
 
 import {
 	GroupId,
@@ -16,7 +16,7 @@ import {
 	McuManager,
 	type McuMgrMessage,
 	type SemVersion,
-} from './mcumgr';
+} from '@tequin/mcumgr';
 
 import { toHex } from '@smithy/util-hex-encoding';
 

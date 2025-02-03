@@ -1,0 +1,3 @@
+[submodule "packages/mcumgr"]
+	path = packages/mcumgr
+	url = https://github.com/TequinDragon/mcumgr-ts

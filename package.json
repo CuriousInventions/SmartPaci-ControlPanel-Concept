@@ -9,11 +9,7 @@
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"lint": "prettier --check . && eslint .",
-		"format": "prettier --write .",
-		"protoc": "run-script-os",
-		"protoc:default": "protoc --plugin ./node_modules/.bin/protoc-gen-es --es_out src/lib/smartpaci/generated --es_opt target=ts ./bluetooth.proto",
-		"protoc:win32": "protoc --plugin ./node_modules/.bin/protoc-gen-es.cmd --es_out src/lib/smartpaci/generated --es_opt target=ts ./bluetooth.proto",
-		"postinstall": "npm run protoc"
+		"format": "prettier --write ."
 	},
 	"devDependencies": {
 		"@bufbuild/protoc-gen-es": "^1.7.0",
@@ -26,7 +22,6 @@
 		"@typescript-eslint/eslint-plugin": "^6.0.0",
 		"@typescript-eslint/parser": "^6.0.0",
 		"autoprefixer": "^10.4.17",
-		"cborg": "^4.0.8",
 		"class-variance-authority": "^0.7.0",
 		"eslint": "^8.56.0",
 		"eslint-config-prettier": "^9.1.0",
@@ -36,8 +31,6 @@
 		"postcss": "^8.4.33",
 		"prettier": "^3.1.1",
 		"prettier-plugin-svelte": "^3.1.2",
-		"protoc": "^1.1.3",
-		"run-script-os": "^1.1.6",
 		"svelte": "^4.2.7",
 		"svelte-check": "^3.6.0",
 		"svelte-feathers": "^1.0.6",
@@ -48,8 +41,12 @@
 	},
 	"type": "module",
 	"dependencies": {
+		"@curious-inventions/smartpaci": "file:packages/paci",
 		"@types/common-errors": "^1.0.5",
 		"@types/web-bluetooth": "^0.0.20",
 		"buttplug": "^3.2.1"
-	}
+	},
+	"workspaces": [
+		"packages/paci"
+	]
 }

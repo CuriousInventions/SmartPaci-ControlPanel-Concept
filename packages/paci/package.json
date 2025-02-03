@@ -1,0 +1,38 @@
+{
+  "name": "@curious-inventions/smartpaci",
+  "version": "0.1.0",
+  "main": "lib/src/paci.js",
+  "types": "lib/src/paci.d.ts",
+  "files": [
+    "lib/**/*.{ts,js}"
+  ],
+  "devDependencies": {
+    "@bufbuild/protoc-gen-es": "^1.7.0",
+    "cborg": "^4.0.8",
+    "protoc": "^1.1.3",
+    "run-script-os": "^1.1.6"
+  },
+  "scripts": {
+    "build": "npm run protoc && tsc",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "protoc": "run-script-os",
+    "protoc:default": "mkdir -p ./generated; protoc --plugin $(npm root)/.bin/protoc-gen-es --es_out ./generated --es_opt target=ts ./bluetooth.proto",
+    "protoc:win32": "mkdir -p ./generated; protoc --plugin (npm root)/.bin/protoc-gen-es.cmd --es_out ./generated --es_opt target=ts ./bluetooth.proto",
+    "postinstall": "npm run protoc"
+  },
+  "author": {
+		"name": "Tequin Dragon",
+		"url": "https://github.com/tequindragon"
+	},
+  "license": "ISC",
+  "description": "Library for interacting with the smart-pacifier from Curious Inventions",
+  "dependencies": {
+    "@smithy/util-hex-encoding": "^4.0.0",
+    "@tequin/mcumgr": "^0.1.2"
+  },
+  "homepage": "http://github.com/curiousinventions/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CuriousInventions/SmartPaci-ControlPanel-Concept.git"
+  }
+}

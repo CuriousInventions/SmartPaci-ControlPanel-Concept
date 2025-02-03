@@ -1,5 +1,5 @@
 import { get, writable } from 'svelte/store';
-import { Paci } from '$lib/smartpaci/paci';
+import { Paci } from '@curious-inventions/smartpaci';
 
 type OtaState =
 	| { state: 'uploading'; uploadPercent: number }
@@ -161,6 +161,9 @@ const actions = {
 			...state,
 			ota: null,
 		}));
+	},
+	setName: async (name: string) => {
+		await paci.setName(name);
 	},
 	hook: {
 		/** Triggered each time the Paci sends updated bite values */

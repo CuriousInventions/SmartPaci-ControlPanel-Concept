@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Paci, type FirmwareInfo } from '$lib/smartpaci/paci';
+	import { Paci, type FirmwareInfo } from '@curious-inventions/smartpaci';
 	import {
 		Badge,
 		Button,
