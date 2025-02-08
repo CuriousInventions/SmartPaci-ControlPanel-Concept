@@ -596,7 +596,7 @@ export class Paci extends typedEventTarget {
 					throw new Error('Cannot upload the same firmware that is already running on the device.');
 
 				// Has it already been uploaded or reverted from a failed upload attempt?
-				if (toHex(images[1].hash) == this._firmwareFileInfo!.hash)
+				if (images.length > 1 && toHex(images[1].hash) == this._firmwareFileInfo!.hash)
 					this.dispatchEvent(new Event('firmwareUploadComplete'));
 				else
 					return this.mcuManager.cmdUpload(await firmware.arrayBuffer());
@@ -625,6 +625,9 @@ export class Paci extends typedEventTarget {
 				return images[1];
 			},
 		);
+
+		// Suspend control messages.
+		await this._controlCharacteristic!.stopNotifications();
 
 		// Send a request for current image slot states.
 		await this._mcuManager.cmdImageState();
