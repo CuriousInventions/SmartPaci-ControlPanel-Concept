@@ -242,6 +242,7 @@ export class Paci extends typedEventTarget {
 		this._features = 0;
 		this._mcuManager.disconnect();
 		await this._device?.gatt?.disconnect();
+		await this._device?.forget();
 		this._disconnectSignal.abort();
 		this.dispatchEvent(new Event('disconnected'));
 	}
@@ -499,7 +500,15 @@ export class Paci extends typedEventTarget {
 		const request = new ControlRequest();
 		request.request = { case: 'setting', value: settingMsg };
 
-		return await this._sendRequest(request);
+		await this._sendRequest(request);
+
+		// Web Bluetooth caches the device name, so we need to manually
+		// trigger a nameChanged event.
+		this._name = name;
+		return new Promise<void>((r) => {
+			this.dispatchEvent(new CustomEvent('nameChanged', { detail: { name: this._name } }));
+			r();
+		});
 	}
 
 	async getName(): Promise<string> {

@@ -73,6 +73,13 @@ paci.addEventListener('connected', async () => {
 	}));
 });
 
+paci.addEventListener('nameChanged', async (event) => {
+	update((state) => {
+		if (!state.deviceInfo)
+			return state;
+		return ({ ...state, deviceInfo: {...state.deviceInfo, name: event.detail.name}});
+	});
+});
 paci.addEventListener('reconnecting', async () => {
 	update((state) => ({ ...state, connectionState: 'reconnecting' }));
 });
