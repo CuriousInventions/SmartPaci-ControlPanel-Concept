@@ -1,5 +1,5 @@
 import { get, writable } from 'svelte/store';
-import { Paci } from '@curious-inventions/smartpaci';
+import { CalibrationType, InputType, Paci } from '@curious-inventions/smartpaci';
 
 type OtaState =
 	| { state: 'uploading'; uploadPercent: number }
@@ -143,6 +143,16 @@ const actions = {
 	},
 	disconnect: async () => {
 		await paci.disconnect();
+	},
+	calibrate: async (sensor: 'bite' | 'suck', state: 'min' | 'max') => {
+		const sensorMap = {
+			bite: InputType.Bite,
+			suck: InputType.Suck,
+		};
+		await paci.calibrateInput(
+			sensorMap[sensor],
+			state == 'min' ? CalibrationType.Min : CalibrationType.Max,
+		);
 	},
 	uploadFirmware: async (firmwareFile: File) => {
 		try {

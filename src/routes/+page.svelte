@@ -8,11 +8,17 @@
 	import paciStore from '$lib/stores/paciStore';
 	import toastStore, { type ToastConfig } from '$lib/stores/toastStore';
 	import PaciPreview from '$lib/components/page/settings/PaciPreview.svelte';
+	import { Button } from 'flowbite-svelte';
+	import { Edit3 as EditIcon } from 'svelte-feathers';
+	import { Sliders as SlidersIcon } from 'svelte-feathers';
+	import Calibration from '$lib/components/utils/Calibration.svelte';
 
 	/** True whenever the paci is connected or reconnecting*/
 	let showAsConnected = false;
 	const showConnectedStates = ['connected', 'reconnecting'];
 	$: showAsConnected = showConnectedStates.includes($paciStore.connectionState);
+
+	let calibrationOpen = false;
 
 	const connectPaci = async () => {
 		try {
@@ -55,6 +61,16 @@
 			}
 		}
 	};
+
+	const updateName = async () => {
+		const name = prompt(
+			'What do you want to name your Smart Paci?',
+			$paciStore.deviceInfo?.name ?? '',
+		);
+		if (name === null) return;
+
+		await paciStore.setName(name);
+	};
 </script>
 
 <Container>
@@ -71,7 +87,13 @@
 						{/if}
 					</h2>
 					{#if showAsConnected}
-						<p><b>Name:</b> {$paciStore.deviceInfo?.name}</p>
+						<p>
+							<b>Name:</b>
+							{$paciStore.deviceInfo?.name}
+							<Button outline={true} color="light" class="!p-2" size="xs" on:click={updateName}>
+								<EditIcon class="w-4 h-4 text-primary-600" />
+							</Button>
+						</p>
 						<p><b>Version:</b> {$paciStore.deviceInfo?.firmware.version}</p>
 						<p><b>Commit:</b> {$paciStore.deviceInfo?.firmware.commit}</p>
 						<p class="mb-3"><b>Built:</b> {$paciStore.deviceInfo?.firmware.buildDate}</p>
@@ -108,10 +130,22 @@
 			<div class="bg-gradient-to-tr from-blue-600/40 to-sky-400/40 rounded-md p-[2px] mb-3">
 				<div class="bg-slate-50 rounded p-3 text-slate-800">
 					<h2 class="text-lg font-comforta font-extrabold mb-1">Sensor Values</h2>
+					<Button
+						outline={true}
+						color="light"
+						class="!p-2 float-end"
+						size="xs"
+						on:click={() => {
+							calibrationOpen = !calibrationOpen;
+						}}
+					>
+						<SlidersIcon class="w-4 h-4 text-primary-600" />
+					</Button>
 					<p class="font-bold">
 						Bite <span class="text-slate-800/60">{$paciStore.sensors.bite.toFixed(2)}%</span>
 					</p>
 					<LoadingBar width={$paciStore.sensors.bite} />
+					<Calibration sensor="bite" open={calibrationOpen} />
 				</div>
 			</div>
 		</div>
