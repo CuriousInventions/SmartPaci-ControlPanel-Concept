@@ -8,19 +8,20 @@ import { writable } from 'svelte/store';
 import paciStore from './paciStore';
 
 interface ButtplugState {
-	connected: boolean;
+	connection: 'disconnected' | 'connecting' | 'connected';
 	devices: ButtplugClientDevice[];
 }
 
 const initialState: ButtplugState = {
-	connected: false,
+	connection: 'disconnected',
 	devices: [],
 };
 
 const state = writable<ButtplugState>(initialState);
 const { update, subscribe } = state;
 
-const buttplugClient = new ButtplugClient();
+const buttplugClient = new ButtplugClient('Smart Paci');
+
 buttplugClient.addListener('deviceadded', (device) => {
 	update((state) => ({ ...state, devices: buttplugClient.devices }));
 });
@@ -29,14 +30,8 @@ buttplugClient.addListener('deviceremoved', (device) => {
 	update((state) => ({ ...state, devices: buttplugClient.devices }));
 });
 
-buttplugClient.addListener('connect', () => {
-	// update((currentState) => ({ ...currentState, connected: true }));
-	console.log('CONNECTEDDDD');
-});
-
 buttplugClient.addListener('disconnect', () => {
-	console.log('dissssCONNECTEDDDD');
-	// update((currentState) => ({ ...currentState, connected: false }));
+	update((currentState) => ({ ...currentState, connection: 'disconnected' }));
 });
 
 // CALLBACKS
@@ -73,12 +68,13 @@ const actions = {
 		const connector = new ButtplugBrowserWebsocketClientConnector(address);
 
 		try {
+			update((currentState) => ({ ...currentState, connection: 'connecting' }));
 			await buttplugClient.connect(connector);
-			// update((state) => ({ ...state, connected: true }));
+			update((currentState) => ({ ...currentState, connection: 'connected' }));
 			paciStore.hook.onBite.register(setVibration);
 		} catch (ex) {
 			console.log(ex);
-			// update((state) => ({ ...state, connected: false }));
+			update((state) => ({ ...state, connection: 'disconnected' }));
 		}
 	},
 	disconnectClient: async () => {
