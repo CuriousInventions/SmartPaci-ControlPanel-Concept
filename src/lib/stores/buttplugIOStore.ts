@@ -1,7 +1,7 @@
 import {
 	ButtplugBrowserWebsocketClientConnector,
 	ButtplugClient,
-	ButtplugClientDevice,
+	type ButtplugClientDevice,
 	ButtplugDeviceError,
 } from 'buttplug';
 import { writable } from 'svelte/store';

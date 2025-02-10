@@ -47,5 +47,5 @@
 		class="drop-shadow-lg h-full"
 		type="image/svg+xml"
 		data="/img/paci-front.svg"
-	/>
+	></object>
 </div>
