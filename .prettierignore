@@ -6,4 +6,4 @@ yarn.lock
 # Ignore known build files in the sub-packages.
 packages/paci/lib/
 packages/paci/generated/
-packages/mcumgr/lib/
+packages/mcumgr/

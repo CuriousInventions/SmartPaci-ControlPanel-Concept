@@ -7,7 +7,5 @@
 		}
 	],
 	"readme": "Readme.md",
-	"projectDocuments": [
-		"docs/Readme.md"
-	]
+	"projectDocuments": ["docs/Readme.md"]
 }
