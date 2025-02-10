@@ -1,6 +1,9 @@
 <script lang="ts">
-	export let isLoading = true;
-	export let size: 'sm' | 'md' = 'md';
+	interface LoaderProps {
+		isLoading: boolean;
+		size: 'sm' | 'md';
+	}
+	let {isLoading = true, size = 'md'} = $props();
 </script>
 
 {#if isLoading}

@@ -8,7 +8,7 @@
 			<h2 class="text-lg font-comforta font-extrabold mb-1">Intiface (Buttplug.io)</h2>
 			<button
 				class="bg-slate-500 text-white rounded p-2 w-full"
-				on:click={buttplugIOStore.connectClient}
+				onclick={buttplugIOStore.connectClient}
 				>Connect Intiface<br />(ws://localhost:12345)</button
 			>
 		{:else if $buttplugIOStore.connection == 'connecting'}
@@ -17,7 +17,7 @@
 		{:else if $buttplugIOStore.connection == 'connected'}
 			<h2 class="text-lg font-comforta font-extrabold mb-1">Connected to Intiface</h2>
 			<button
-				on:click={buttplugIOStore.disconnectClient}
+				onclick={buttplugIOStore.disconnectClient}
 				class="border-2 border-red-600/90 hover:bg-red-600/100 transition-all duration-200 p-2 w-full rounded text-red-600 hover:text-white"
 				>Disconnect</button
 			>

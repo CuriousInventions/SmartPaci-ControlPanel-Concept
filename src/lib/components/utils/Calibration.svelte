@@ -1,8 +1,13 @@
 <script lang="ts">
 	import paciStore from '$lib/stores/paciStore';
 	import { Button, Modal } from 'flowbite-svelte';
-	export let open = false;
-	export let sensor: null | 'bite' | 'suck' = null;
+
+	interface CalibrationProps {
+		open: boolean,
+		sensor: null | 'bite' | 'suck',
+	}
+
+	let { open = false, sensor = null }: CalibrationProps = $props();
 
 	paciStore.connect;
 </script>
@@ -18,7 +23,7 @@
 	</ol>
 	<Button
 		color="alternative"
-		on:click={async () => {
+		onclick={async () => {
 			if (sensor != null) paciStore.calibrate(sensor, 'min');
 		}}
 	>
@@ -26,7 +31,7 @@
 	</Button>
 	<Button
 		color="alternative"
-		on:click={async () => {
+		onclick={async () => {
 			if (sensor != null) paciStore.calibrate(sensor, 'max');
 		}}
 	>
@@ -35,7 +40,7 @@
 	<svelte:fragment slot="footer">
 		<Button
 			class="ms-auto"
-			on:click={() => {
+			onclick={() => {
 				open = false;
 			}}>Close</Button
 		>

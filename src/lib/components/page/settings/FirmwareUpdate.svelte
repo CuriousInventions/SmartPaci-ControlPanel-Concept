@@ -74,7 +74,7 @@
 					id="fileFirmware"
 					type="file"
 					accept=".dfu,.bin"
-					on:change={handleFirmwareFileChange}
+					onchange={handleFirmwareFileChange}
 				/>
 				{#if firmwareFileError != ''}
 					<Helper class="mt-2" color="red">
@@ -105,7 +105,7 @@
 							color="light"
 							class="!p-2"
 							size="xs"
-							on:click={() => {
+							onclick={() => {
 								navigator.clipboard.writeText(firmwareInfo?.hash ?? '');
 								toastStore.post({ intent: 'info', title: 'Copied to Clipboard!', duration: 1000 });
 							}}
@@ -122,7 +122,7 @@
 							color="light"
 							class="!p-2"
 							size="xs"
-							on:click={() => {
+							onclick={() => {
 								navigator.clipboard.writeText(firmwareInfo?.version.commit ?? '');
 								toastStore.post({ intent: 'info', title: 'Copied to Clipboard!', duration: 1000 });
 							}}
@@ -142,7 +142,7 @@
 				color="primary"
 				class="bg-sky-600 rounded p-2 w-full "
 				disabled={firmwareInfo == null}
-				on:click={openFirmwareUploadModal}>Update</Button
+				onclick={openFirmwareUploadModal}>Update</Button
 			>
 		{:else}
 			<div class="text-xs text-slate-800/50">Please connect your Smart Paci</div>
@@ -193,25 +193,25 @@
 	<svelte:fragment slot="footer">
 		{#if $paciStore.ota?.state == null}
 			{#if !firmwareUploadStarted}
-				<Button on:click={() => (firmwareUploadOpen = false)}>Close</Button>
+				<Button onclick={() => (firmwareUploadOpen = false)}>Close</Button>
 				<Button
 					color="yellow"
-					on:click={startFirmwareUpload}
+					onclick={startFirmwareUpload}
 					disabled={$paciStore.connectionState != 'connected'}>Proceed</Button
 				>
 			{:else}
-				<Button color="green" on:click={() => (firmwareUploadOpen = false)}>Close</Button>
+				<Button color="green" onclick={() => (firmwareUploadOpen = false)}>Close</Button>
 			{/if}
 		{:else if $paciStore.ota?.state == 'restarting'}
 			<Button
-				on:click={async () => {
+				onclick={async () => {
 					await paciStore.disconnect();
 					await paciStore.connect();
 				}}>Reconnect</Button
 			>
 			<span>Taking too long?</span>
 		{:else if $paciStore.ota.state == 'failed'}
-			<Button color="red" on:click={() => (firmwareUploadOpen = false)}>Close</Button>
+			<Button color="red" onclick={() => (firmwareUploadOpen = false)}>Close</Button>
 		{/if}
 	</svelte:fragment>
 </Modal>

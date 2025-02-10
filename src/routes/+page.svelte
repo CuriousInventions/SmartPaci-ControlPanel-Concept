@@ -90,7 +90,7 @@
 						<p>
 							<b>Name:</b>
 							{$paciStore.deviceInfo?.name}
-							<Button outline={true} color="light" class="!p-2" size="xs" on:click={updateName}>
+							<Button outline={true} color="light" class="!p-2" size="xs" onclick={updateName}>
 								<EditIcon class="w-4 h-4 text-primary-600" />
 							</Button>
 						</p>
@@ -98,13 +98,13 @@
 						<p><b>Commit:</b> {$paciStore.deviceInfo?.firmware.commit}</p>
 						<p class="mb-3"><b>Built:</b> {$paciStore.deviceInfo?.firmware.buildDate}</p>
 						<button
-							on:click={paciStore.disconnect}
+							onclick={paciStore.disconnect}
 							class="border-2 border-red-600/90 hover:bg-red-600/100 transition-all duration-200 p-2 w-full rounded text-red-600 hover:text-white"
 							>Disconnect</button
 						>
 					{:else}
 						<button
-							on:click={connectPaci}
+							onclick={connectPaci}
 							disabled={$paciStore.connectionState !== 'disconnected'}
 							class="bg-green-600/90 hover:bg-green-600/100 p-2 w-full rounded text-white mb-1 disabled:bg-green-800/100 disabled:cursor-wait"
 							>{#if $paciStore.connectionState === 'connecting'}
@@ -135,7 +135,7 @@
 						color="light"
 						class="!p-2 float-end"
 						size="xs"
-						on:click={() => {
+						onclick={() => {
 							calibrationOpen = !calibrationOpen;
 						}}
 					>

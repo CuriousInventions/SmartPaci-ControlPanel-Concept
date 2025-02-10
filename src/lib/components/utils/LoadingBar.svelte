@@ -1,5 +1,5 @@
 <script lang="ts">
-	export let width = 0;
+	let { width = 0 } : { width: number } = $props();
 </script>
 
 <div class="w-full bg-slate-300 rounded-full h-3 relative overflow-hidden">
