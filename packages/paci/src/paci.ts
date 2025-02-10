@@ -335,6 +335,29 @@ private readonly CHARACTERISTIC_BATTERY_LEVEL = 'battery_level';
 		await this._connect();
 	}
 
+	/** Wrapper around {@link BluetoothRemoteGATTCharacteristic.startNotifications} to try again if the device is busy */
+	private async _startNotifications(characteristic: BluetoothRemoteGATTCharacteristic): Promise<void> {
+		return new Promise(async (resolve) => {
+			let startNotifications = async () => {
+				try {
+					await characteristic.startNotifications();
+					resolve();
+				} catch (error) {
+					// Dear Web Bluetooth spec....
+					// NotSupportError should really be OperationError or something to indicate "busy".
+					if (!(error instanceof Error) || error.name != 'NotSupportedError')
+						throw error;
+
+					// GATT service only supports one concurrent operation at a time.
+					// Try again when it's hopefully not busy.
+					console.debug(`Device busy, could not subscribe to characteristic ${characteristic.uuid}. Retrying...`);
+					setTimeout(startNotifications, 100);
+				}
+			};
+			await startNotifications();
+		});
+	}
+
 	private async _connect(): Promise<void> {
 		if (this._device == null) throw new Error('No device selected.');
 		console.info('Connecting');
@@ -403,8 +426,9 @@ private readonly CHARACTERISTIC_BATTERY_LEVEL = 'battery_level';
 					{ signal: this._disconnectSignal.signal } as any,
 				);
 
-				await this._batteryCharacteristic.startNotifications();
-				await this._batteryCharacteristic?.readValue();
+				await this._startNotifications(this._batteryCharacteristic);
+				await this._batteryCharacteristic.readValue();
+
 			} catch (error) {
 				if (error instanceof Error && error.name == 'NotFoundError') {
 					// Assume no battery is present.
@@ -428,7 +452,7 @@ private readonly CHARACTERISTIC_BATTERY_LEVEL = 'battery_level';
 					},
 					{ signal: this._disconnectSignal.signal } as any,
 				);
-				await this._biteCharacteristic.startNotifications();
+				await this._startNotifications(this._biteCharacteristic);
 				this._features |= PaciFeature.Bite;
 			} catch (error) {
 				if (error instanceof Error && error.name == 'NotFoundError') {
@@ -455,7 +479,8 @@ private readonly CHARACTERISTIC_BATTERY_LEVEL = 'battery_level';
 					},
 					{ signal: this._disconnectSignal.signal } as any,
 				);
-				await this._suckCharacteristic.startNotifications();
+
+				await this._startNotifications(this._suckCharacteristic);
 				this._features |= PaciFeature.Suck;
 			} catch (error) {
 				if (error instanceof Error && error.name == 'NotFoundError') {
@@ -485,7 +510,7 @@ private readonly CHARACTERISTIC_BATTERY_LEVEL = 'battery_level';
 					},
 					{ signal: this._disconnectSignal.signal } as any,
 				);
-				await this._touchCharacteristic.startNotifications();
+				await this._startNotifications(this._touchCharacteristic);
 				this._features |= PaciFeature.Touch;
 			} catch (error) {
 				if (error instanceof Error && error.name == 'NotFoundError') {
@@ -537,7 +562,7 @@ private readonly CHARACTERISTIC_BATTERY_LEVEL = 'battery_level';
 				}
 			});
 
-			await this._controlCharacteristic.startNotifications();
+			await this._startNotifications(this._controlCharacteristic);
 
 			this.dispatchEvent(
 				new CustomEvent('featuresUpdated', { detail: { features: this._features } }),
