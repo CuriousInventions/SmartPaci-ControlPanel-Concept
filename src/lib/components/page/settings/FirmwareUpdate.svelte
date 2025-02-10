@@ -155,7 +155,9 @@
 	title="Firmware Upload"
 	bind:open={firmwareUploadOpen}
 	dismissable={false}
-	classFooter={[undefined, 'failed', 'restarting'].includes($paciStore.ota?.state) ? '' : 'collapse'}
+	classFooter={[undefined, 'failed', 'restarting'].includes($paciStore.ota?.state)
+		? ''
+		: 'collapse'}
 >
 	{#if $paciStore.ota?.state == null}
 		{#if !firmwareUploadStarted}
@@ -201,7 +203,12 @@
 				<Button color="green" on:click={() => (firmwareUploadOpen = false)}>Close</Button>
 			{/if}
 		{:else if $paciStore.ota?.state == 'restarting'}
-			<Button on:click={async () => {await paciStore.disconnect(); await paciStore.connect()}}>Reconnect</Button>
+			<Button
+				on:click={async () => {
+					await paciStore.disconnect();
+					await paciStore.connect();
+				}}>Reconnect</Button
+			>
 			<span>Taking too long?</span>
 		{:else if $paciStore.ota.state == 'failed'}
 			<Button color="red" on:click={() => (firmwareUploadOpen = false)}>Close</Button>

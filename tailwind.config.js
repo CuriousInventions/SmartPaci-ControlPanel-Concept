@@ -1,19 +1,22 @@
-import flowbitePlugin from 'flowbite/plugin'
+import flowbitePlugin from 'flowbite/plugin';
 
 /** @type {import('tailwindcss').Config} */
 export default {
-	content: ['./src/**/*.{html,js,svelte,ts}', './node_modules/flowbite-svelte/**/*.{html,js,svelte,ts}'],
+	content: [
+		'./src/**/*.{html,js,svelte,ts}',
+		'./node_modules/flowbite-svelte/**/*.{html,js,svelte,ts}',
+	],
 	theme: {
 		extend: {
 			fontFamily: {
 				sans: ['Lato', 'sans-serif'],
-				comforta: ['Comfortaa', 'sans-serif']
+				comforta: ['Comfortaa', 'sans-serif'],
 			},
 			colors: {
 				// flowbite-svelte
 				primary: {
 					// Tailwind Sky color pallet
-					50:  '#f0f9ff',
+					50: '#f0f9ff',
 					100: '#e0f2fe',
 					200: '#bae6fd',
 					300: '#7dd3fc',
@@ -23,10 +26,10 @@ export default {
 					700: '#0369a1',
 					800: '#075985',
 					900: '#0c4a6e',
-					950: '#082f49'
-				}
-			}
-		}
+					950: '#082f49',
+				},
+			},
+		},
 	},
-	plugins: [flowbitePlugin]
+	plugins: [flowbitePlugin],
 };

@@ -2,3 +2,8 @@
 pnpm-lock.yaml
 package-lock.json
 yarn.lock
+
+# Ignore known build files in the sub-packages.
+packages/paci/lib/
+packages/paci/generated/
+packages/mcumgr/lib/

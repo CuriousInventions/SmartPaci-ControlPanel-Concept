@@ -75,9 +75,8 @@ paci.addEventListener('connected', async () => {
 
 paci.addEventListener('nameChanged', async (event) => {
 	update((state) => {
-		if (!state.deviceInfo)
-			return state;
-		return ({ ...state, deviceInfo: {...state.deviceInfo, name: event.detail.name}});
+		if (!state.deviceInfo) return state;
+		return { ...state, deviceInfo: { ...state.deviceInfo, name: event.detail.name } };
 	});
 });
 paci.addEventListener('reconnecting', async () => {
@@ -116,6 +115,7 @@ paci.addEventListener('firmwareUploadComplete', async (event) => {
 		}));
 		await paci.applyFirmwareUpdate();
 	} catch (error) {
+		console.error(error);
 		const reason = error instanceof Error ? error.message : 'An unknown problem has happened';
 		update((state) => ({
 			...state,
@@ -165,6 +165,7 @@ const actions = {
 		try {
 			await paci.uploadFirmwareFile(firmwareFile);
 		} catch (error) {
+			console.error(error);
 			const reason = error instanceof Error ? error.message : 'An unknown error occurred';
 
 			update((state) => ({
