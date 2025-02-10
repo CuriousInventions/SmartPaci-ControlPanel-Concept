@@ -20,37 +20,53 @@ import {
 
 import { toHex } from '@smithy/util-hex-encoding';
 
+/** All of the possible sensor inputs that might be present on a Smart Paci. */
 export enum InputType {
+/** Reports a normalised value of the teat sensor as the user bites down with their mouth. */
 	Bite,
+/** Reports a normalised value of the teat sensor as the user sucks with their mouth. */
 	Suck,
 }
 
+/**
+ * Used for calibrating the sensor inputs on the Smart Paci.
+ * @see {@link Paci.calibrateInput}
+ */
 export enum CalibrationType {
 	Min,
 	Max,
 }
 
+/** @internal */
+const ReleaseVariantArray = ['dirty', 'alpha', 'beta', 'rc', 'preview'] as const;
+/** @internal */
+type ReleaseVariant = '' | (typeof ReleaseVariantArray)[number];
+
 /**
- * Convert a semantic version (usually returned from McuBoot images) into version objects for the
- * Smart Pacifier.
+ * Version information is stored in McuBoot images, however alpha, beta, release-candidate information is encoded in the build component of the semantic version.
  *
- * The descript is encoded into the 32bit-build component of the SemVersion.
- * @param version
- * @returns
+ * This class converts {@link SemVersion} and stringifies the version information.
+ *
+ * @remarks As an example; The build component of `v0.1.10.268435456` (268435456) translates to `-alpha`
  */
 export class PaciVersion {
 	private _version: SemVersion;
+/** The most relevant hash from the git commit history of the firmware image. */
 	commit: string;
+/** The build time (in UTC) of the firmware image. */
 	datetime: Date;
-	variant: string;
+	/** `""` | `"dirty"` | `"alpha"` | `"beta"` | `"rc"` | `"preview"` */
+	variant: ReleaseVariant;
+	/** The firmware SHA256 hash as calculated according to McuBoot spec. */
 	hash: string;
 
-	constructor(
-		version: SemVersion | string,
-		commit: string = '',
-		datetime?: Date,
-		hash: string = '',
-	) {
+	/**
+	 * @param version The McuBoot image's version. If provided as a string, it will be parsed into a semantic version's respective parts.
+	 * @param commit The most relevant hash from the git commit history of the firmware image.
+	 * @param datetime The build time (in UTC) of the firmware image.
+	 * @param hash The firmware SHA256 hash as calculated according to McuBoot spec.
+	 */
+	constructor(version: SemVersion | string, commit?: string, datetime?: Date, hash?: string) {
 		if (typeof version == 'string') {
 			const parts = version.split('.').map((p) => Number(p));
 			version = {
@@ -61,13 +77,12 @@ export class PaciVersion {
 			};
 		}
 		this._version = version;
-		this.commit = commit;
-		this.hash = hash;
+		this.commit = commit ?? '';
+		this.hash = hash ?? '';
 		this.datetime = datetime ?? new Date(NaN);
 
-		const release = ['dirty', 'alpha', 'beta', 'rc', 'preview'];
-		const releaseType = (this._version.build & 0xf0000000) >> 28;
-		this.variant = releaseType in release ? release[releaseType] : '';
+				const releaseType = (this._version.build & 0xf0000000) >> 28;
+		this.variant = releaseType in ReleaseVariantArray ? ReleaseVariantArray[releaseType] : '';
 	}
 
 	toString(): string {
@@ -134,15 +149,60 @@ interface PaciEventTarget extends EventTarget {
 // Again, see: https://dev.to/43081j/strongly-typed-event-emitters-using-eventtarget-in-typescript-3658
 const typedEventTarget = EventTarget as { new (): PaciEventTarget; prototype: PaciEventTarget };
 
+/**
+ * The main class for communicating with the Smart Paci
+ *
+ * @example Connecting to the Smart Paci and listening to bite events
+ * ```ts
+ * import {Paci} from '@curious-inventions/smartpaci`
+ *
+ * const paci = new Paci();
+ * paci.addEventListener('bite', event => {
+ * 	console.log(`Bite amount is ${event.detail.value} out of 255`);
+ * });
+ *
+ * await paci.connect();
+ * ```
+ * ### Events
+ * - `'battery'` {@link https://developer.mozilla.org/en-US/docs/Web/API/CustomEvent | CustomEvent<\{ value: number \}> }
+ *   Event emitted when the battery status is updated. The value is between `0` to `100` representing charge percent.
+ *
+ * - `'bite'` {@link https://developer.mozilla.org/en-US/docs/Web/API/CustomEvent | CustomEvent<\{ value: number \}> }
+ *
+ * - `'suck'` {@link https://developer.mozilla.org/en-US/docs/Web/API/CustomEvent | CustomEvent<\{ values: number[] \}> }
+ *
+ * - `'touch'` {@link https://developer.mozilla.org/en-US/docs/Web/API/CustomEvent | CustomEvent<\{ values: number[] \}> }
+ *
+ * - `'connected'` {@link https://developer.mozilla.org/en-US/docs/Web/API/Event | Event}
+ *
+ * - `'disconnected'` {@link https://developer.mozilla.org/en-US/docs/Web/API/Event | Event}
+ *
+ * - `'reconnecting'` {@link https://developer.mozilla.org/en-US/docs/Web/API/Event | Event}
+ *
+ * - `'nameChanged'` {@link https://developer.mozilla.org/en-US/docs/Web/API/CustomEvent | CustomEvent<\{ name: string \}> }
+ *
+ * - `'firmwareVersion'` {@link https://developer.mozilla.org/en-US/docs/Web/API/CustomEvent | CustomEvent<\{ version: PaciVersion \}> }
+ *
+ * - `'featuresUpdated'` {@link https://developer.mozilla.org/en-US/docs/Web/API/CustomEvent | CustomEvent<\{ features: number \}> }
+ *
+ * - `'firmwareUploadProgress'` {@link https://developer.mozilla.org/en-US/docs/Web/API/CustomEvent | CustomEvent<\{ progressPercent: number \}> }
+ *
+ * - `'firmwareUploadComplete'` {@link https://developer.mozilla.org/en-US/docs/Web/API/Event | Event}
+ */
 export class Paci extends typedEventTarget {
+/** The UUID identifying the Smart Paci service on the Bluetooth LE GATT connection. */
 	readonly SERVICE_UUID = 'abbd1ef0-62e8-493b-8549-8cb891483e20';
+/** The UUID identifying the control endpoint characteristic on the Smart Paci service. */
 	readonly CHARACTERISTIC_CONTROL_UUID = 'abbd1ef1-62e8-493b-8549-8cb891483e20';
+/** The UUID identifying the suck sensor characteristic characteristic on the Smart Paci service. */
 	readonly CHARACTERISTIC_FORCE_UUID = 'abbd1ef2-62e8-493b-8549-8cb891483e20';
+/** The UUID identifying the bite sensor characteristic characteristic on the Smart Paci service. */
 	readonly CHARACTERISTIC_BITE_UUID = 'abbd1ef3-62e8-493b-8549-8cb891483e20';
+/** The UUID identifying the touch sensors characteristic characteristic on the Smart Paci service. */
 	readonly CHARACTERISTIC_TOUCH_UUID = 'abbd1ef4-62e8-493b-8549-8cb891483e20';
 
-	readonly SERVICE_BATTERY = 'battery_service';
-	readonly CHARACTERISTIC_BATTERY_LEVEL = 'battery_level';
+private readonly SERVICE_BATTERY = 'battery_service';
+private readonly CHARACTERISTIC_BATTERY_LEVEL = 'battery_level';
 
 	private _device: BluetoothDevice | null;
 	private _service: BluetoothRemoteGATTService | undefined;
@@ -192,13 +252,13 @@ export class Paci extends typedEventTarget {
 
 	private async onMcuManagerConnected(_: Event): Promise<void> {
 		do {
-			try{
+			try {
 				await this._mcuManager.cmdImageState();
 				return;
 			} catch {
-				await new Promise<void>(r => setTimeout(() => r(), 1000));
+				await new Promise<void>((r) => setTimeout(() => r(), 1000));
 			}
-		} while(this._device?.gatt?.connected);
+		} while (this._device?.gatt?.connected);
 	}
 
 	private async onMcuManagerMessage(event: CustomEvent<McuMgrMessage>): Promise<void> {
@@ -273,7 +333,6 @@ export class Paci extends typedEventTarget {
 		this._disconnectSignal.abort();
 		this.dispatchEvent(new Event('reconnecting'));
 		await this._connect();
-
 	}
 
 	private async _connect(): Promise<void> {
@@ -304,7 +363,7 @@ export class Paci extends typedEventTarget {
 						this.dispatchEvent(new Event('disconnected'));
 					}
 				},
-				{signal: this._disconnectSignal.signal } as any,
+				{ signal: this._disconnectSignal.signal } as any,
 			);
 
 			const server = await this._device.gatt?.connect();
@@ -323,8 +382,7 @@ export class Paci extends typedEventTarget {
 				this._mcuManager.attach(this._device!);
 				this._features |= PaciFeature.McuMgr;
 			} catch (error) {
-				if (error instanceof Error && error.name == 'NetworkError')
-					throw error;
+				if (error instanceof Error && error.name == 'NetworkError') throw error;
 				console.debug('Unhandled error while getting McuMgr service', error);
 			}
 
@@ -373,7 +431,7 @@ export class Paci extends typedEventTarget {
 				await this._biteCharacteristic.startNotifications();
 				this._features |= PaciFeature.Bite;
 			} catch (error) {
-				if (error instanceof Error && error.name == 'NotFoundError'){
+				if (error instanceof Error && error.name == 'NotFoundError') {
 					console.warn('No bite sensor available.');
 				} else {
 					throw error;
@@ -400,7 +458,7 @@ export class Paci extends typedEventTarget {
 				await this._suckCharacteristic.startNotifications();
 				this._features |= PaciFeature.Suck;
 			} catch (error) {
-				if (error instanceof Error && error.name == 'NotFoundError'){
+				if (error instanceof Error && error.name == 'NotFoundError') {
 					console.warn('No suck sensor available');
 				} else {
 					throw error;
@@ -430,7 +488,7 @@ export class Paci extends typedEventTarget {
 				await this._touchCharacteristic.startNotifications();
 				this._features |= PaciFeature.Touch;
 			} catch (error) {
-				if (error instanceof Error && error.name == 'NotFoundError'){
+				if (error instanceof Error && error.name == 'NotFoundError') {
 					console.warn('No touch sensor available.');
 				} else {
 					throw error;
@@ -461,7 +519,9 @@ export class Paci extends typedEventTarget {
 											build: version.build,
 										},
 										toHex(version.commit),
-										new Date(version.timestamp == BigInt(0) ? NaN : Number(version.timestamp) * 1000),
+										new Date(
+											version.timestamp == BigInt(0) ? NaN : Number(version.timestamp) * 1000,
+										),
 										toHex(version.hash),
 									),
 								},
@@ -484,9 +544,8 @@ export class Paci extends typedEventTarget {
 			);
 			this.dispatchEvent(new Event('connected'));
 		} catch (error) {
-			if (error instanceof Error && error.name == 'NetworkError'){
-				if (!this._device.gatt?.connected)
-					await this._reconnect();
+			if (error instanceof Error && error.name == 'NetworkError') {
+				if (!this._device.gatt?.connected) await this._reconnect();
 			} else {
 				throw error;
 			}
@@ -607,9 +666,7 @@ export class Paci extends typedEventTarget {
 				// Has it already been uploaded or reverted from a failed upload attempt?
 				if (images.length > 1 && toHex(images[1].hash) == this._firmwareFileInfo!.hash)
 					this.dispatchEvent(new Event('firmwareUploadComplete'));
-				else
-					return this.mcuManager.cmdUpload(await firmware.arrayBuffer());
-
+				else return this.mcuManager.cmdUpload(await firmware.arrayBuffer());
 			},
 		);
 		await this.mcuManager.cmdImageState();

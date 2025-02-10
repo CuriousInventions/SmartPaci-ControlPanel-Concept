@@ -1,0 +1,13 @@
+{
+	"entryPoints": ["src/paci.ts", "generated/bluetooth_pb.ts"],
+	"outputs": [
+		{
+			"name": "html",
+			"path": "lib/docs"
+		}
+	],
+	"readme": "Readme.md",
+	"projectDocuments": [
+		"docs/Readme.md"
+	]
+}
