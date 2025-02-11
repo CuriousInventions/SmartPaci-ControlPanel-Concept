@@ -679,7 +679,7 @@ private readonly CHARACTERISTIC_BATTERY_LEVEL = 'battery_level';
 		});
 	}
 
-	async uploadFirmwareFile(firmware: File): Promise<void> {
+	async uploadFirmwareFile(firmware: File | ArrayBuffer): Promise<void> {
 		this._firmwareFileInfo = await Paci.getFirmwareInfo(firmware);
 		const statResponse = this._waitMcuMgrResponse(GroupId.Image, GroupImageId.State).then(
 			async (message) => {
@@ -691,7 +691,8 @@ private readonly CHARACTERISTIC_BATTERY_LEVEL = 'battery_level';
 				// Has it already been uploaded or reverted from a failed upload attempt?
 				if (images.length > 1 && toHex(images[1].hash) == this._firmwareFileInfo!.hash)
 					this.dispatchEvent(new Event('firmwareUploadComplete'));
-				else return this.mcuManager.cmdUpload(await firmware.arrayBuffer());
+				else
+					return this.mcuManager.cmdUpload(firmware instanceof File ? await firmware.arrayBuffer() : firmware);
 			},
 		);
 		await this.mcuManager.cmdImageState();
@@ -769,10 +770,18 @@ private readonly CHARACTERISTIC_BATTERY_LEVEL = 'battery_level';
 		return await this._sendRequest(request);
 	}
 
-	static async getFirmwareInfo(file: File): Promise<FirmwareInfo> {
+	static async getFirmwareInfo(file: File | ArrayBuffer): Promise<FirmwareInfo> {
+		let fileData = new ArrayBuffer();
+		if (file instanceof File) {
 		if (file.size > 10_000_000) throw new Error('File is too large.');
+			fileData = await file.arrayBuffer();
+		} else if (file instanceof ArrayBuffer) {
+			if (file.byteLength > 10_000_000) throw new Error('File is too large.');
+			fileData = file;
+		} else {
+			throw new Error('Unsupported file parameter');
+		}
 
-		const fileData = await file.arrayBuffer();
 		const firmwareInfo = await new McuManager().imageInfo(fileData);
 
 		if (!firmwareInfo.hashValid) throw new Error(`Invalid hash: ${toHex(firmwareInfo.hash)}`);

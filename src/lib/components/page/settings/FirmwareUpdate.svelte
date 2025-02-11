@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { Paci, type FirmwareInfo } from '@curious-inventions/smartpaci';
+
+	import SmartPaciFirmware from '/static/firmware/smartpaci-latest.dfu?url'
 	import {
 		Badge,
 		Button,
@@ -9,19 +11,30 @@
 		Alert,
 		Progressbar,
 		Spinner,
+		Accordion,
+		AccordionItem,
 	} from 'flowbite-svelte';
 
-	import { Copy as CopyIcon } from 'svelte-feathers';
+	import {
+		Copy as CopyIcon,
+		Upload as UploadIcon
+	 } from 'svelte-feathers';
 
 	import paciStore from '$lib/stores/paciStore';
 	import toastStore from '$lib/stores/toastStore';
 	import { onMount } from 'svelte';
 
-	let firmwareFile: File | null = null;
+	let firmwareFile: File | ArrayBuffer | null = null;
 	let firmwareFileError: string = '';
 	let firmwareInfo: FirmwareInfo | null;
+	let selectedFirmwareToUpload: File | ArrayBuffer | null = null;
 	let firmwareUploadOpen = false;
 	let firmwareUploadStarted = false;
+
+	let latestFirmwareFile: File | ArrayBuffer | null = null;
+	let latestFirmwareInfo: FirmwareInfo | null;
+
+	let showUploadInput = false;
 
 	const handleFirmwareFileChange = async (event: Event) => {
 		firmwareFileError = '';
@@ -38,18 +51,25 @@
 		}
 	};
 
-	async function openFirmwareUploadModal(): Promise<void> {
+	async function openFirmwareUploadModal(firmware: File | ArrayBuffer | null): Promise<void> {
 		paciStore.clearFirmwareUpload();
+		selectedFirmwareToUpload = firmware;
 		firmwareUploadOpen = true;
 		firmwareUploadStarted = false;
 	}
 	async function startFirmwareUpload(): Promise<void> {
-		if (firmwareFile == null || $paciStore.connectionState != 'connected') return;
-		await paciStore.uploadFirmware(firmwareFile);
+		if (selectedFirmwareToUpload == null || $paciStore.connectionState != 'connected') return;
+		await paciStore.uploadFirmware(selectedFirmwareToUpload);
 		firmwareUploadStarted = true;
 	}
 
-	onMount(() => {
+	onMount(async () => {
+		latestFirmwareFile = await fetch(SmartPaciFirmware).then((response) => response.arrayBuffer());
+		if (latestFirmwareFile !== null)
+			latestFirmwareInfo = await Paci.getFirmwareInfo(latestFirmwareFile);
+
+		console.log("latest firmware is: ", latestFirmwareInfo);
+
 		// Try to prevent navigation away from the page.
 		addEventListener('beforeunload', (event) => {
 			if ($paciStore.ota?.state != null) {
@@ -62,88 +82,106 @@
 
 <div class="bg-gradient-to-tr from-blue-600/40 to-sky-400/40 rounded-md p-[2px]">
 	<div class="bg-slate-50 rounded p-3 text-slate-800">
+		<Button
+			outline={true}
+			color="light"
+			class="!p-2 float-end"
+			size="xs"
+			onclick="{() => showUploadInput = !showUploadInput}"
+		>
+			<UploadIcon class="w-4 h-4 text-primary-600" />
+		</Button>
 		<h2 class="text-lg font-comforta font-extrabold mb-1">Firmware Update</h2>
-		{#if $paciStore.connectionState === 'connected' || true}
-			<div class="mb-2">
-				<label class="block mb-1 text-sm font-medium" for="fileFirmware">Firmware Image</label>
-				<Fileupload
-					class="block w-full rounded bg-slate-200"
-					size="sm"
-					color={firmwareFileError == '' ? 'base' : 'red'}
-					aria-describedby="fileFirmwareHelp"
-					id="fileFirmware"
-					type="file"
-					accept=".dfu,.bin"
-					onchange={handleFirmwareFileChange}
-				/>
-				{#if firmwareFileError != ''}
-					<Helper class="mt-2" color="red">
-						<span class="font-medium">Heck!</span>
-						{firmwareFileError}
-					</Helper>
-				{/if}
-				<p class="mt-1 text-sm text-gray-500" id="fileFirmwareHelp">.dfu or .bin</p>
-			</div>
-			{#if firmwareInfo}
-				<div class="mb-3 bg-slate-200 p-2 rounded">
-					<p class="font-bold">
-						Firmware info
-						{#if firmwareInfo.hashValid}
-							<Badge rounded color="green">Valid</Badge>
-						{:else}
-							<Badge rounded color="red">Invalid</Badge>
-						{/if}
-					</p>
-					<p>
-						Version: {firmwareInfo?.version}<br />
-						Hash:
-						<span title={firmwareInfo?.hash}
-							><samp>{firmwareInfo?.hash.slice(0, 12)}</samp>&hellip;</span
-						>
-						<Button
-							outline={true}
-							color="light"
-							class="!p-2"
-							size="xs"
-							onclick={() => {
-								navigator.clipboard.writeText(firmwareInfo?.hash ?? '');
-								toastStore.post({ intent: 'info', title: 'Copied to Clipboard!', duration: 1000 });
-							}}
-						>
-							<CopyIcon class="w-4 h-4 text-primary-600" />
-						</Button>
-						<br />
-						Commit:
-						<span title={firmwareInfo?.version.commit}
-							><samp>{firmwareInfo?.version.commit.slice(0, 12)}</samp>&hellip;</span
-						>
-						<Button
-							outline={true}
-							color="light"
-							class="!p-2"
-							size="xs"
-							onclick={() => {
-								navigator.clipboard.writeText(firmwareInfo?.version.commit ?? '');
-								toastStore.post({ intent: 'info', title: 'Copied to Clipboard!', duration: 1000 });
-							}}
-						>
-							<CopyIcon class="w-4 h-4 text-primary-600" />
-						</Button>
-						<br />
-						Built:
-						<et
-							>{firmwareInfo.version.datetime.toDateString()}
-							{firmwareInfo.version.datetime.toLocaleTimeString()}</et
-						>
-					</p>
-				</div>
+
+		{#snippet firmwareThingy(title: string, info: FirmwareInfo | null, firmware: File | ArrayBuffer | null)}
+			{#if info}
+				<Accordion flush>
+					<AccordionItem>
+						<span slot="header">{title} - v{info?.version}</span>
+						<p>
+							<b>Hash:</b>
+							<span title={info?.hash}
+								><samp>{info?.hash.slice(0, 12)}</samp>&hellip;</span
+							>
+							<Button
+								outline={true}
+								color="light"
+								class="!p-2"
+								size="xs"
+								onclick={() => {
+									navigator.clipboard.writeText(info?.hash ?? '');
+									toastStore.post({ intent: 'info', title: 'Copied to Clipboard!', duration: 1000 });
+								}}
+							>
+								<CopyIcon class="w-4 h-4 text-primary-600" />
+							</Button>
+							{#if info.hashValid}
+								<Badge rounded color="green">Valid</Badge>
+							{:else}
+								<Badge rounded color="red">Invalid</Badge>
+							{/if}
+							<br />
+							<b>Commit:</b>
+							<span title={info?.version.commit}
+								><samp>{info?.version.commit.slice(0, 12)}</samp>&hellip;</span
+							>
+							<Button
+								outline={true}
+								color="light"
+								class="!p-2"
+								size="xs"
+								onclick={() => {
+									navigator.clipboard.writeText(info?.version.commit ?? '');
+									toastStore.post({ intent: 'info', title: 'Copied to Clipboard!', duration: 1000 });
+								}}
+							>
+								<CopyIcon class="w-4 h-4 text-primary-600" />
+							</Button>
+							<br />
+							<b>Built:</b>
+							<et
+								>{info.version.datetime.toDateString()}
+								{info.version.datetime.toLocaleTimeString()}</et
+							>
+						</p>
+					</AccordionItem>
+				</Accordion>
 			{/if}
 			<Button
 				color="primary"
 				class="bg-sky-600 rounded p-2 w-full "
-				disabled={firmwareInfo == null}
-				onclick={openFirmwareUploadModal}>Update</Button
+				disabled={info == null}
+				onclick={() => openFirmwareUploadModal(firmware)}>Update</Button
 			>
+		{/snippet}
+
+		{#if $paciStore.connectionState === 'connected' || true}
+			{#if showUploadInput}
+				<div class="mb-2">
+					<label class="block mb-1 text-sm font-medium" for="fileFirmware">Firmware Image</label>
+					<Fileupload
+						class="block w-full rounded bg-slate-200"
+						size="sm"
+						color={firmwareFileError == '' ? 'base' : 'red'}
+						aria-describedby="fileFirmwareHelp"
+						id="fileFirmware"
+						type="file"
+						accept=".dfu,.bin"
+						onchange={handleFirmwareFileChange}
+					/>
+					{#if firmwareFileError != ''}
+						<Helper class="mt-2" color="red">
+							<span class="font-medium">Heck!</span>
+							{firmwareFileError}
+						</Helper>
+					{/if}
+					<p class="mt-1 text-sm text-gray-500" id="fileFirmwareHelp">.dfu or .bin</p>
+				</div>
+				{@render firmwareThingy("Firwmare Info", firmwareInfo, firmwareFile)}
+			{:else}
+				{@render firmwareThingy("Latest Firmware", latestFirmwareInfo, latestFirmwareFile)}
+			{/if}
+
 		{:else}
 			<div class="text-xs text-slate-800/50">Please connect your Smart Paci</div>
 		{/if}

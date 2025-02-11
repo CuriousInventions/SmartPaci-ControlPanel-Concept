@@ -161,7 +161,7 @@ const actions = {
 			state == 'min' ? CalibrationType.Min : CalibrationType.Max,
 		);
 	},
-	uploadFirmware: async (firmwareFile: File) => {
+	uploadFirmware: async (firmwareFile: File | ArrayBuffer) => {
 		try {
 			await paci.uploadFirmwareFile(firmwareFile);
 		} catch (error) {
